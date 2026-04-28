@@ -8,8 +8,9 @@ from llama_index.embeddings.huggingface  import HuggingFaceEmbedding
 from llama_index.llms.openai  import OpenAI
 import chromadb
 
-#  This  configuration  silences  the  noisy  logs  from  underlying  libraries
-logging.basicConfig(stream=sys.stdout,  level=logging.INFO)
+#  This  configuration  silences  the  noisy  logs  from  underlying  libraries.
+#  Logs  are  directed  to  stderr  so  stdout  is  reserved  for  the  answer  text.
+logging.basicConfig(stream=sys.stderr,  level=logging.WARNING)
 logging.getLogger("llama_index").setLevel(logging.WARNING)
 logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.WARNING)
@@ -39,8 +40,8 @@ except Exception  as e:
 
 #  4.  LOAD  VECTOR  DATABASE  AND  INDEX
 try:
-    db_path  =  "/app/chroma_db"
-    storage_path  =  "/app/storage"
+    db_path  =  os.getenv("RAG_DB_PATH",  "/app/chroma_db")
+    storage_path  =  os.getenv("RAG_STORAGE_PATH",  "/app/storage")
     db  =  chromadb.PersistentClient(path=db_path)
     chroma_collection  =  db.get_or_create_collection("my_collection")
     vector_store  =  ChromaVectorStore(chroma_collection=chroma_collection)

@@ -11,12 +11,15 @@ from llama_index.vector_stores.chroma  import ChromaVectorStore
 from llama_index.embeddings.huggingface  import HuggingFaceEmbedding
 import chromadb
 
-#  Define  absolute  paths  for  use  inside  the  Docker  container
-DB_PATH  =  "/app/chroma_db"
-DOCS_PATH  =  "/app/docs"
-STORAGE_PATH  =  "/app/storage"
+#  Paths  default  to  container  locations  but  can  be  overridden  via  environment  variables.
+DB_PATH  =  os.getenv("RAG_DB_PATH",  "/app/chroma_db")
+DOCS_PATH  =  os.getenv("RAG_DOCS_PATH",  "/app/docs")
+STORAGE_PATH  =  os.getenv("RAG_STORAGE_PATH",  "/app/storage")
 
 print("---  Smart  Ingestion  Script  Started  ---")
+print(f"Using  DB_PATH={DB_PATH}")
+print(f"Using  DOCS_PATH={DOCS_PATH}")
+print(f"Using  STORAGE_PATH={STORAGE_PATH}")
 
 try:
     db  =  chromadb.PersistentClient(path=DB_PATH)
@@ -33,7 +36,8 @@ try:
     existing_items  =  chroma_collection.get(include=["metadatas"])
     indexed_files  =  set(meta['file_path']  for meta  in existing_items['metadatas'])
     print(f"Found  {len(indexed_files)} source  files  already  in  the  index.")
-except Exception:
+except Exception as e:
+    print(f"Warning:  Could  not  retrieve  existing  metadata:  {e}",  file=sys.stderr)
     indexed_files  =  set()
 
 all_files_on_disk  =  set()
@@ -57,8 +61,8 @@ try:
     try:
         index  =  load_index_from_storage(storage_context)
         print("Loaded  existing  index  from  storage.")
-    except:
-        print("No  existing  index  found.  Creating  a  new  one.")
+    except Exception as e:
+        print(f"No  existing  index  found  (reason:  {e}).  Creating  a  new  one.")
         index  =  VectorStoreIndex.from_documents([],  storage_context=storage_context)
 
     for filepath  in new_files_to_process:

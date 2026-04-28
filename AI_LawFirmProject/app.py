@@ -1,10 +1,17 @@
+import os
 import streamlit  as st
 import requests
-import json
 
 #  IMPORTANT:  This  URL  uses  the  n8n  service  name  from  docker-compose.
 #  The  final  path  segment  must  match  the  production  URL  from  your  n8n  Webhook  node.
-N8N_WEBHOOK_URL  =  "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8"
+#  Override  by  setting  the  N8N_WEBHOOK_URL  environment  variable.
+N8N_WEBHOOK_URL  =  os.getenv(
+    "N8N_WEBHOOK_URL",
+    "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8"
+)
+
+if not isinstance(N8N_WEBHOOK_URL, str) or not N8N_WEBHOOK_URL.strip() or not N8N_WEBHOOK_URL.startswith(("http://", "https://")):
+    raise ValueError("N8N_WEBHOOK_URL must be a non-empty http(s) URL.")
 
 st.title("Private  AI  Assistant")
 st.info("Ask  a  question  about  your  documents.")
@@ -17,7 +24,7 @@ if submit_button  and question:
     with st.spinner("Searching  documents  and  generating  an  answer..."):
         try:
             payload  =  {"question":  question}
-            response  =  requests.post(N8N_WEBHOOK_URL,  json=payload)
+            response  =  requests.post(N8N_WEBHOOK_URL,  json=payload,  timeout=120)
             response.raise_for_status()
             result  =  response.json()
 
@@ -33,5 +40,7 @@ if submit_button  and question:
                 st.error("The  workflow  returned  an  unexpected  response  format.")
                 st.json(result)
 
+        except requests.exceptions.Timeout:
+            st.error("The request timed out. The workflow may be stalled. Please try again.")
         except Exception  as e:
             st.error(f"An  unexpected  error  occurred:  {e}")
