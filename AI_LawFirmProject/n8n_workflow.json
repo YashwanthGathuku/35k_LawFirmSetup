@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "command": "=python3 /app/rag_scripts/query_rag.py \"{{ $json.body.question.replace(/\"/g, '\\\\\"') }}\""
+        "command": "=python3 /app/rag_scripts/query_rag.py \"{{ $json.body.question.replace(/\"/g, '\\\\\"') }}\" --top-k {{ $json.body.top_k || 3 }} {{ $json.body.use_cag ? '--use-cag' : '' }}"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -16,7 +16,7 @@
     },
     {
       "parameters": {
-        "command": "python3 /app/rag_scripts/rag_setup.py"
+        "command": "=python3 /app/rag_scripts/rag_setup.py {{ $json.body.use_nougat ? '--nougat' : '' }}"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,

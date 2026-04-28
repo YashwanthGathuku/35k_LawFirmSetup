@@ -1,5 +1,6 @@
 import os
 import sys
+import argparse
 from llama_index.core  import (
     VectorStoreIndex,
     SimpleDirectoryReader,
@@ -30,14 +31,17 @@ DB_PATH = _resolve_path("--db-path", "RAG_DB_PATH", "/app/chroma_db")
 DOCS_PATH = _resolve_path("--docs-path", "RAG_DOCS_PATH", "/app/docs")
 STORAGE_PATH = _resolve_path("--storage-path", "RAG_STORAGE_PATH", "/app/storage")
 
-print("---  LexAI Smart Ingestion Engine Started  ---")
+# Parse Nougat argument
+USE_NOUGAT = "--nougat" in sys.argv
+
+print(f"---  LexAI Smart Ingestion Engine Started {'(Deep Ingestion Mode: Nougat)' if USE_NOUGAT else ''} ---")
 
 try:
     db  =  chromadb.PersistentClient(path=DB_PATH)
     chroma_collection  =  db.get_or_create_collection("my_collection")
     vector_store  =  ChromaVectorStore(chroma_collection=chroma_collection)
 
-    # Advanced: Custom node parser for legal documents (larger chunks, more context)
+    # Advanced: Custom node parser for legal documents
     Settings.text_splitter = SentenceSplitter(chunk_size=1024, chunk_overlap=100)
 
     embed_model  =  HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
@@ -78,10 +82,29 @@ try:
         print("Initializing new vector index.")
         index  =  VectorStoreIndex.from_documents([],  storage_context=storage_context)
 
+    # Optional Nougat Reader
+    nougat_reader = None
+    if USE_NOUGAT:
+        try:
+            from llama_index.readers.nougat_ocr import PDFNougatOCR
+            nougat_reader = PDFNougatOCR()
+            print("Nougat OCR initialized for high-accuracy PDF parsing.")
+        except ImportError:
+            print("Warning: llama-index-readers-nougat-ocr not found. Falling back to default reader.")
+
     for filepath  in new_files_to_process:
         print(f"Processing: {os.path.basename(filepath)}")
-        # Metadata extraction is handled by SimpleDirectoryReader by default (file_name, file_path, etc)
-        new_document  =  SimpleDirectoryReader(input_files=[filepath]).load_data()
+
+        if nougat_reader and filepath.lower().endswith(".pdf"):
+            try:
+                new_document = nougat_reader.load_data(filepath)
+                print(f"Used Nougat OCR for '{os.path.basename(filepath)}'.")
+            except Exception as e:
+                print(f"Nougat failed for '{os.path.basename(filepath)}': {e}. Falling back to default.")
+                new_document = SimpleDirectoryReader(input_files=[filepath]).load_data()
+        else:
+            new_document  =  SimpleDirectoryReader(input_files=[filepath]).load_data()
+
         index.insert_nodes(Settings.text_splitter.get_nodes_from_documents(new_document))
         print(f"Successfully indexed '{os.path.basename(filepath)}'.")
 

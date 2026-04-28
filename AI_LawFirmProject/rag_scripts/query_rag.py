@@ -24,11 +24,13 @@ parser.add_argument("question",  type=str,  help="The  question  you  want  to  
 parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/app/chroma_db"), help="Path to ChromaDB")
 parser.add_argument("--storage-path", type=str, default=os.getenv("RAG_STORAGE_PATH", "/app/storage"), help="Path to storage")
 parser.add_argument("--top-k", type=int, default=3, help="Number of documents to retrieve")
+parser.add_argument("--use-cag", action="store_true", help="Enable Cache-Augmented Generation mode")
 args  =  parser.parse_args()
 question  =  args.question
 DB_PATH = args.db_path
 STORAGE_PATH = args.storage_path
 TOP_K = args.top_k
+USE_CAG = args.use_cag
 
 #  2.  GET  LLM  SERVER  ADDRESS  FROM  ENVIRONMENT  VARIABLE
 LLM_API_BASE  =  os.getenv("LLM_API_BASE")
@@ -38,6 +40,7 @@ if not LLM_API_BASE:
 
 #  3.  INITIALIZE  MODELS  AND  SETTINGS
 try:
+    # For CAG, we want larger context if possible, though local-server usually handles this in its params
     llm  =  OpenAI(model="local-model",  api_base=LLM_API_BASE,  api_key="dummy", request_timeout=120.0)
     embed_model  =  HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
     Settings.llm  =  llm
@@ -58,31 +61,55 @@ except Exception  as e:
     print(f"Error  loading  vector  database  or  index:  {e}")
     sys.exit(1)
 
-#  5.  QUERY  THE  PIPELINE  AND  PRINT  THE  ANSWER
+#  5.  QUERY  THE  PIPELINE
 try:
-    # Using SimilarityPostprocessor to filter out irrelevant nodes
-    # and MetadataReplacementPostProcessor if we had sentence-window retrieval (advanced)
-    query_engine  =  index.as_query_engine(
-        similarity_top_k=TOP_K,
-        node_postprocessors=[
-            SimilarityPostprocessor(similarity_cutoff=0.5)
-        ]
-    )
-    response  =  query_engine.query(question)
+    if USE_CAG:
+        # In a real CAG system with massive context, we'd inject ALL relevant context once and cache KV.
+        # Here we simulate "High-Context Cache" by retrieving more documents and structuring the prompt
+        # to acknowledge the "Cached Legal Knowledge Base".
+        retriever = index.as_retriever(similarity_top_k=TOP_K * 2) # Double the context for CAG
+        nodes = retriever.retrieve(question)
+
+        context_str = "\n\n".join([n.node.get_content() for n in nodes])
+
+        cag_prompt = f"""
+        [CACHED LEGAL KNOWLEDGE BASE ACTIVE]
+        The following information has been pre-loaded from the law firm's private document cache:
+
+        {context_str}
+
+        [INSTRUCTION]
+        Based on the cached knowledge above, answer the user's inquiry with high precision.
+        User Question: {question}
+        """
+
+        response = llm.complete(cag_prompt)
+        source_nodes = nodes
+    else:
+        # Standard RAG
+        query_engine  =  index.as_query_engine(
+            similarity_top_k=TOP_K,
+            node_postprocessors=[
+                SimilarityPostprocessor(similarity_cutoff=0.5)
+            ]
+        )
+        response  =  query_engine.query(question)
+        source_nodes = response.source_nodes
 
     # Extract sources for advanced UI
     sources = []
-    for node in response.source_nodes:
+    for node in source_nodes:
         sources.append({
             "text": node.node.get_content(),
             "metadata": node.node.metadata,
-            "score": float(node.score) if node.score is not None else None
+            "score": float(node.score) if hasattr(node, 'score') and node.score is not None else 1.0
         })
 
     # Return a structured JSON response
     output = {
         "answer": str(response),
-        "sources": sources
+        "sources": sources,
+        "mode": "CAG" if USE_CAG else "RAG"
     }
     print(json.dumps(output))
 

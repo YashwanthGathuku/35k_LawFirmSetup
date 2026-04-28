@@ -6,4 +6,9 @@ llama-index
 llama-index-vector-stores-chroma
 llama-index-embeddings-huggingface
 llama-index-llms-openai
+llama-index-readers-nougat-ocr
 rank_bm25
+torch
+torchvision
+transformers
+pydantic
