@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "command": "=echo \"{{ $json.body.question }}\" | base64 | xargs -I {} python3 /app/rag_scripts/query_rag.py \"$(echo {} | base64 -d)\" --top-k {{ $json.body.top_k || 3 }} {{ $json.body.use_cag ? '--use-cag' : '' }}"
+        "command": "=echo \"{{ $json.body.question }}\" | base64 | xargs -I {} python3 /app/rag_scripts/query_rag.py \"$(echo {} | base64 -d)\" --top-k {{ $json.body.top_k || 3 }} {{ $json.body.use_cag ? '--use-cag' : '' }} {{ $json.body.use_srlc ? '--use-srlc' : '' }} --model-type {{ $json.body.model_type || 'llama.cpp' }} --model-name \"{{ $json.body.model_name || 'local-model' }}\""
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,

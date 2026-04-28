@@ -3,13 +3,15 @@ import sys
 import argparse
 import logging
 import json
+import requests
 from llama_index.core  import VectorStoreIndex,  StorageContext,  load_index_from_storage,  Settings
 from llama_index.vector_stores.chroma  import ChromaVectorStore
 from llama_index.embeddings.huggingface  import HuggingFaceEmbedding
 from llama_index.llms.openai  import OpenAI
-from llama_index.core.postprocessor import MetadataReplacementPostProcessor
+from llama_index.llms.ollama import Ollama
 from llama_index.core.postprocessor import SimilarityPostprocessor
 import chromadb
+from srlc_engine import SRLCEngine
 
 #  This  configuration  silences  the  noisy  logs  from  underlying  libraries
 logging.basicConfig(stream=sys.stderr,  level=logging.INFO)
@@ -25,23 +27,31 @@ parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/ap
 parser.add_argument("--storage-path", type=str, default=os.getenv("RAG_STORAGE_PATH", "/app/storage"), help="Path to storage")
 parser.add_argument("--top-k", type=int, default=3, help="Number of documents to retrieve")
 parser.add_argument("--use-cag", action="store_true", help="Enable Cache-Augmented Generation mode")
+parser.add_argument("--use-srlc", action="store_true", help="Enable Self-Reflective Legal Critique algorithm")
+parser.add_argument("--model-type", type=str, default="llama.cpp", choices=["llama.cpp", "ollama"], help="Type of LLM backend")
+parser.add_argument("--model-name", type=str, default="local-model", help="Name of the model (mostly for Ollama)")
+
 args  =  parser.parse_args()
 question  =  args.question
 DB_PATH = args.db_path
 STORAGE_PATH = args.storage_path
 TOP_K = args.top_k
 USE_CAG = args.use_cag
+USE_SRLC = args.use_srlc
+MODEL_TYPE = args.model_type
+MODEL_NAME = args.model_name
 
-#  2.  GET  LLM  SERVER  ADDRESS  FROM  ENVIRONMENT  VARIABLE
-LLM_API_BASE  =  os.getenv("LLM_API_BASE")
-if not LLM_API_BASE:
-    print("Error:  The  LLM_API_BASE  environment  variable  was  not  set.")
-    sys.exit(1)
+#  2.  GET  LLM  SERVER  ADDRESSES
+LLM_API_BASE  =  os.getenv("LLM_API_BASE", "http://llm-server:8080/v1")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 
 #  3.  INITIALIZE  MODELS  AND  SETTINGS
 try:
-    # For CAG, we want larger context if possible, though local-server usually handles this in its params
-    llm  =  OpenAI(model="local-model",  api_base=LLM_API_BASE,  api_key="dummy", request_timeout=120.0)
+    if MODEL_TYPE == "ollama":
+        llm = Ollama(model=MODEL_NAME, base_url=OLLAMA_HOST, request_timeout=180.0)
+    else:
+        llm  =  OpenAI(model="local-model",  api_base=LLM_API_BASE,  api_key="dummy", request_timeout=120.0)
+
     embed_model  =  HuggingFaceEmbedding(model_name="sentence-transformers/all-MiniLM-L6-v2")
     Settings.llm  =  llm
     Settings.embed_model  =  embed_model
@@ -63,53 +73,44 @@ except Exception  as e:
 
 #  5.  QUERY  THE  PIPELINE
 try:
-    if USE_CAG:
-        # In a real CAG system with massive context, we'd inject ALL relevant context once and cache KV.
-        # Here we simulate "High-Context Cache" by retrieving more documents and structuring the prompt
-        # to acknowledge the "Cached Legal Knowledge Base".
-        retriever = index.as_retriever(similarity_top_k=TOP_K * 2) # Double the context for CAG
-        nodes = retriever.retrieve(question)
+    retriever = index.as_retriever(similarity_top_k=TOP_K * (2 if USE_CAG else 1))
+    nodes = retriever.retrieve(question)
+    context_str = "\n\n".join([n.node.get_content() for n in nodes])
 
-        context_str = "\n\n".join([n.node.get_content() for n in nodes])
+    thought_stream = []
 
-        cag_prompt = f"""
-        [CACHED LEGAL KNOWLEDGE BASE ACTIVE]
-        The following information has been pre-loaded from the law firm's private document cache:
-
-        {context_str}
-
-        [INSTRUCTION]
-        Based on the cached knowledge above, answer the user's inquiry with high precision.
-        User Question: {question}
-        """
-
-        response = llm.complete(cag_prompt)
-        source_nodes = nodes
+    if USE_SRLC:
+        srlc = SRLCEngine(llm)
+        srlc_result = srlc.run(question, context_str)
+        answer = srlc_result["final"]
+        thought_stream = [
+            {"step": "Drafting", "content": srlc_result["draft"]},
+            {"step": "Self-Critique", "content": srlc_result["critique"]},
+            {"step": "Refining", "content": srlc_result["final"]}
+        ]
+    elif USE_CAG:
+        cag_prompt = f"[CACHED LEGAL KNOWLEDGE]\n{context_str}\n\nQuestion: {question}"
+        answer = str(llm.complete(cag_prompt))
     else:
-        # Standard RAG
-        query_engine  =  index.as_query_engine(
-            similarity_top_k=TOP_K,
-            node_postprocessors=[
-                SimilarityPostprocessor(similarity_cutoff=0.5)
-            ]
-        )
-        response  =  query_engine.query(question)
-        source_nodes = response.source_nodes
+        query_engine = index.as_query_engine(similarity_top_k=TOP_K)
+        response = query_engine.query(question)
+        answer = str(response)
 
-    # Extract sources for advanced UI
+    # Extract sources
     sources = []
-    for node in source_nodes:
+    for node in nodes:
         sources.append({
             "text": node.node.get_content(),
             "metadata": node.node.metadata,
             "score": float(node.score) if hasattr(node, 'score') and node.score is not None else 1.0
         })
 
-    # Return a structured JSON response
     output = {
-        "answer": str(response),
+        "answer": answer,
         "sources": sources,
-        "mode": "CAG" if USE_CAG else "RAG"
+        "thought_stream": thought_stream,
+        "mode": "SRLC" if USE_SRLC else ("CAG" if USE_CAG else "RAG"),
+        "model": MODEL_NAME
     }
     print(json.dumps(output))
 

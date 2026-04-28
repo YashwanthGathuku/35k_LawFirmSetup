@@ -16,6 +16,8 @@ services:
       context: .
       dockerfile: streamlit.Dockerfile
     restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
     networks:
       - private-ai-net
 
@@ -26,6 +28,7 @@ services:
     restart: unless-stopped
     environment:
       - LLM_API_BASE=http://llm-server:8080/v1
+      - OLLAMA_HOST=http://ollama:11434
       - N8N_SECURE_COOKIE=false
     volumes:
       - ./n8n-data:/home/node/.n8n
@@ -53,8 +56,24 @@ services:
     networks:
       - private-ai-net
 
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - private-ai-net
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
 networks:
   private-ai-net:
 
 volumes:
   caddy_data:
+  ollama_data:
