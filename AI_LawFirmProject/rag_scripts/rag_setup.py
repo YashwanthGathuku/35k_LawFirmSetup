@@ -13,28 +13,23 @@ from llama_index.embeddings.huggingface  import HuggingFaceEmbedding
 from llama_index.core.node_parser import SentenceSplitter
 import chromadb
 
-#  Define default absolute paths for use inside the Docker container,
-#  while allowing overrides via CLI args or environment variables.
-def _get_path_arg(flag_name):
-    args = sys.argv[1:]
-    for i, arg in enumerate(args):
-        if arg == flag_name and i + 1 < len(args):
-            return args[i + 1]
-        if arg.startswith(flag_name + "="):
-            return arg.split("=", 1)[1]
-    return None
+#  1.  SETUP  COMMAND-LINE  ARGUMENT  PARSER
+parser = argparse.ArgumentParser(description="LexAI Smart Ingestion Engine")
+parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/app/chroma_db"), help="Path to ChromaDB")
+parser.add_argument("--docs-path", type=str, default=os.getenv("RAG_DOCS_PATH", "/app/docs"), help="Path to legal documents")
+parser.add_argument("--storage-path", type=str, default=os.getenv("RAG_STORAGE_PATH", "/app/storage"), help="Path to index storage")
+parser.add_argument("--nougat", action="store_true", help="Enable Deep Ingestion Mode (Nougat OCR)")
 
-def _resolve_path(flag_name, env_name, default_path):
-    return _get_path_arg(flag_name) or os.getenv(env_name) or default_path
-
-DB_PATH = _resolve_path("--db-path", "RAG_DB_PATH", "/app/chroma_db")
-DOCS_PATH = _resolve_path("--docs-path", "RAG_DOCS_PATH", "/app/docs")
-STORAGE_PATH = _resolve_path("--storage-path", "RAG_STORAGE_PATH", "/app/storage")
-
-# Parse Nougat argument
-USE_NOUGAT = "--nougat" in sys.argv
+args = parser.parse_args()
+DB_PATH = args.db_path
+DOCS_PATH = args.docs_path
+STORAGE_PATH = args.storage_path
+USE_NOUGAT = args.nougat
 
 print(f"---  LexAI Smart Ingestion Engine Started {'(Deep Ingestion Mode: Nougat)' if USE_NOUGAT else ''} ---")
+print(f"Using DB_PATH={DB_PATH}")
+print(f"Using DOCS_PATH={DOCS_PATH}")
+print(f"Using STORAGE_PATH={STORAGE_PATH}")
 
 try:
     db  =  chromadb.PersistentClient(path=DB_PATH)
@@ -104,6 +99,11 @@ try:
                 new_document = SimpleDirectoryReader(input_files=[filepath]).load_data()
         else:
             new_document  =  SimpleDirectoryReader(input_files=[filepath]).load_data()
+
+        # Ensure file_name is in metadata for consistent citations
+        for doc in new_document:
+            if 'file_name' not in doc.metadata:
+                doc.metadata['file_name'] = os.path.basename(filepath)
 
         index.insert_nodes(Settings.text_splitter.get_nodes_from_documents(new_document))
         print(f"Successfully indexed '{os.path.basename(filepath)}'.")

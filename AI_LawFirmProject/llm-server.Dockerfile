@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     cmake \
     build-essential \
-    ca-certificates
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN git clone --depth 1 --branch b4096 https://github.com/ggerganov/llama.cpp.git /llama.cpp
 WORKDIR /llama.cpp

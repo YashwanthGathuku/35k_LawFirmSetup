@@ -40,6 +40,8 @@ st.markdown("""
 # --- Constants & Helpers ---
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+DOCS_DIR = os.getenv("DOCS_DIR", "/app/docs")
+SIDEBAR_ICON_PATH = os.getenv("SIDEBAR_ICON_PATH", "/app/assets/sidebar-icon.png")
 
 def get_ollama_models():
     try:
@@ -52,6 +54,11 @@ def get_ollama_models():
 
 # --- Sidebar ---
 with st.sidebar:
+    if os.path.exists(SIDEBAR_ICON_PATH):
+        st.image(SIDEBAR_ICON_PATH, width=100)
+    else:
+        st.markdown("## ⚖️")
+
     st.title("LexAI Pro v3.0")
     st.markdown("---")
 
@@ -76,8 +83,13 @@ with st.sidebar:
 
     st.markdown("---")
     if st.button("🔄 Sync & Re-index Docs"):
-        requests.post(N8N_WEBHOOK_URL, json={"use_nougat": use_nougat})
-        st.info("Re-indexing started.")
+        with st.spinner("Requesting knowledge base sync..."):
+            try:
+                # Trigger ingestion by passing an 'ingest' flag
+                requests.post(N8N_WEBHOOK_URL, json={"ingest": True, "use_nougat": use_nougat}, timeout=10)
+                st.success("Re-indexing started.")
+            except Exception as e:
+                st.error(f"Sync request failed: {e}")
 
 # --- Main UI ---
 st.title("⚖️ Legal Intelligence Portal")
@@ -100,25 +112,51 @@ if query:
                     "model_name": model_name
                 }
                 response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=240)
+                response.raise_for_status()
                 result = response.json()
 
-                raw_stdout = result[0].get('stdout', '') if isinstance(result, list) else result.get('stdout', '')
-                data = json.loads(raw_stdout)
+                # Check for direct answer from webhook (backward compatibility)
+                answer_text = ""
+                sources = []
+                thought_stream = []
+
+                if isinstance(result, list) and len(result) > 0:
+                    raw_stdout = result[0].get('stdout', '')
+                    answer_text = result[0].get('answer', '')
+                else:
+                    raw_stdout = result.get('stdout', '')
+                    answer_text = result.get('answer', '')
+
+                # If raw_stdout contains JSON, parse it for advanced data
+                if raw_stdout:
+                    try:
+                        data = json.loads(raw_stdout)
+                        answer_text = data.get("answer", answer_text)
+                        sources = data.get("sources", [])
+                        thought_stream = data.get("thought_stream", [])
+                    except json.JSONDecodeError:
+                        # Fallback to treat raw_stdout as plain text answer if not JSON
+                        if not answer_text:
+                            answer_text = raw_stdout
 
                 # Show Thought Stream
-                if data.get("thought_stream"):
+                if thought_stream:
                     with st.status("Algorithm Thought Process", expanded=False) as status:
-                        for step in data["thought_stream"]:
+                        for step in thought_stream:
                             st.markdown(f"**Step: {step['step']}**")
                             st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
                         status.update(label="Critique & Refinement Complete", state="complete")
 
-                st.markdown(data.get("answer", "Inquiry failed."))
+                st.markdown(answer_text if answer_text else "No answer generated.")
 
-                if data.get("sources"):
-                    with st.expander("📚 Sources & Citations"):
-                        for src in data["sources"]:
-                            st.markdown(f'<div class="source-card"><strong>{src["metadata"].get("file_name")}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
+                if sources:
+                    with st.expander(f"📚 Sources & Citations ({len(sources)} verified)"):
+                        for src in sources:
+                            meta = src.get('metadata', {})
+                            file_name = meta.get('file_name')
+                            file_path = meta.get('file_path')
+                            fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
+                            st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
 
             except Exception as e:
                 st.error(f"Error: {e}")

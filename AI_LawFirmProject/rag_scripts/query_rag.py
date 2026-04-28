@@ -13,14 +13,16 @@ from llama_index.core.postprocessor import SimilarityPostprocessor
 import chromadb
 from srlc_engine import SRLCEngine
 
-#  This  configuration  silences  the  noisy  logs  from  underlying  libraries
-logging.basicConfig(stream=sys.stderr,  level=logging.INFO)
+#  1.  SETUP  LOGGING
+#  Logs  are  directed  to  stderr  so  stdout  is  reserved  for  the  JSON  output.
+LOG_LEVEL = logging.INFO if os.getenv("RAG_DEBUG_LOGS", "").lower() in ("1", "true", "yes", "on") else logging.WARNING
+logging.basicConfig(stream=sys.stderr,  level=LOG_LEVEL)
 logging.getLogger("llama_index").setLevel(logging.WARNING)
 logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.WARNING)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 
-#  1.  SETUP  COMMAND-LINE  ARGUMENT  PARSER
+#  2.  SETUP  COMMAND-LINE  ARGUMENT  PARSER
 parser  =  argparse.ArgumentParser(description="Query  the  RAG  pipeline  with  a  specific  question.")
 parser.add_argument("question",  type=str,  help="The  question  you  want  to  ask.")
 parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/app/chroma_db"), help="Path to ChromaDB")
@@ -41,11 +43,11 @@ USE_SRLC = args.use_srlc
 MODEL_TYPE = args.model_type
 MODEL_NAME = args.model_name
 
-#  2.  GET  LLM  SERVER  ADDRESSES
+#  3.  GET  LLM  SERVER  ADDRESSES
 LLM_API_BASE  =  os.getenv("LLM_API_BASE", "http://llm-server:8080/v1")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 
-#  3.  INITIALIZE  MODELS  AND  SETTINGS
+#  4.  INITIALIZE  MODELS  AND  SETTINGS
 try:
     if MODEL_TYPE == "ollama":
         llm = Ollama(model=MODEL_NAME, base_url=OLLAMA_HOST, request_timeout=180.0)
@@ -56,10 +58,10 @@ try:
     Settings.llm  =  llm
     Settings.embed_model  =  embed_model
 except Exception  as e:
-    print(f"Error  initializing  models:  {e}")
+    logging.error(f"Error  initializing  models:  {e}")
     sys.exit(1)
 
-#  4.  LOAD  VECTOR  DATABASE  AND  INDEX
+#  5.  LOAD  VECTOR  DATABASE  AND  INDEX
 try:
     db  =  chromadb.PersistentClient(path=DB_PATH)
     chroma_collection  =  db.get_or_create_collection("my_collection")
@@ -68,10 +70,10 @@ try:
 
     index  =  load_index_from_storage(storage_context)
 except Exception  as e:
-    print(f"Error  loading  vector  database  or  index:  {e}")
+    logging.error(f"Error  loading  vector  database  or  index:  {e}")
     sys.exit(1)
 
-#  5.  QUERY  THE  PIPELINE
+#  6.  QUERY  THE  PIPELINE
 try:
     retriever = index.as_retriever(similarity_top_k=TOP_K * (2 if USE_CAG else 1))
     nodes = retriever.retrieve(question)
@@ -115,5 +117,5 @@ try:
     print(json.dumps(output))
 
 except Exception  as e:
-    print(f"Error  during  querying:  {e}")
+    logging.error(f"Error  during  querying:  {e}")
     sys.exit(1)
