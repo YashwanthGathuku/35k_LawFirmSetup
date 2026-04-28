@@ -15,17 +15,24 @@ import chromadb
 
 #  Define default absolute paths for use inside the Docker container,
 #  while allowing overrides via CLI args or environment variables.
-parser = argparse.ArgumentParser(description="Ingest documents into the RAG pipeline.")
-parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/app/chroma_db"), help="Path to ChromaDB")
-parser.add_argument("--docs-path", type=str, default=os.getenv("RAG_DOCS_PATH", "/app/docs"), help="Path to documents")
-parser.add_argument("--storage-path", type=str, default=os.getenv("RAG_STORAGE_PATH", "/app/storage"), help="Path to storage")
-parser.add_argument("--nougat", action="store_true", help="Use Nougat OCR for PDF ingestion")
-args = parser.parse_args()
+def _get_path_arg(flag_name):
+    args = sys.argv[1:]
+    for i, arg in enumerate(args):
+        if arg == flag_name and i + 1 < len(args):
+            return args[i + 1]
+        if arg.startswith(flag_name + "="):
+            return arg.split("=", 1)[1]
+    return None
 
-DB_PATH = args.db_path
-DOCS_PATH = args.docs_path
-STORAGE_PATH = args.storage_path
-USE_NOUGAT = args.nougat
+def _resolve_path(flag_name, env_name, default_path):
+    return _get_path_arg(flag_name) or os.getenv(env_name) or default_path
+
+DB_PATH = _resolve_path("--db-path", "RAG_DB_PATH", "/app/chroma_db")
+DOCS_PATH = _resolve_path("--docs-path", "RAG_DOCS_PATH", "/app/docs")
+STORAGE_PATH = _resolve_path("--storage-path", "RAG_STORAGE_PATH", "/app/storage")
+
+# Parse Nougat argument
+USE_NOUGAT = "--nougat" in sys.argv
 
 print(f"---  LexAI Smart Ingestion Engine Started {'(Deep Ingestion Mode: Nougat)' if USE_NOUGAT else ''} ---")
 

@@ -7,11 +7,12 @@ from llama_index.core  import VectorStoreIndex,  StorageContext,  load_index_fro
 from llama_index.vector_stores.chroma  import ChromaVectorStore
 from llama_index.embeddings.huggingface  import HuggingFaceEmbedding
 from llama_index.llms.openai  import OpenAI
+from llama_index.core.postprocessor import MetadataReplacementPostProcessor
 from llama_index.core.postprocessor import SimilarityPostprocessor
 import chromadb
 
-#  Route logs to stderr so stdout is reserved exclusively for the JSON output
-logging.basicConfig(stream=sys.stderr,  level=logging.WARNING)
+#  This  configuration  silences  the  noisy  logs  from  underlying  libraries
+logging.basicConfig(stream=sys.stderr,  level=logging.INFO)
 logging.getLogger("llama_index").setLevel(logging.WARNING)
 logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
 logging.getLogger("chromadb.telemetry.product.posthog").setLevel(logging.WARNING)
