@@ -37,8 +37,9 @@ if submit_button  and question:
                 st.success("Answer:")
                 st.write(answer)
             else:
-                st.error("The  workflow  returned  an  unexpected  response  format.")
-                st.json(result)
+                st.error("The assistant returned an unexpected response format. Please try again.")
+                # Log detailed error for debugging if needed, but don't show all to user
+                # st.json(result)
 
         except requests.exceptions.Timeout:
             st.error("The request timed out. The workflow may be stalled. Please try again.")

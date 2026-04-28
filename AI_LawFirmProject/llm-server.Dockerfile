@@ -20,6 +20,7 @@ ARG LLAMACPP_TAG=b4096
 RUN git  clone  --depth  1  --branch  ${LLAMACPP_TAG}  \
     https://github.com/ggerganov/llama.cpp.git  /llama.cpp
 
+RUN git clone https://github.com/ggerganov/llama.cpp.git /llama.cpp
 WORKDIR /llama.cpp
 
 #  Build  a  static  binary  so  the  runtime  stage  needs  no  shared  libs

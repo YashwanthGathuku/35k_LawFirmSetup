@@ -19,8 +19,12 @@ logging.getLogger("httpx").setLevel(logging.WARNING)
 #  1.  SETUP  COMMAND-LINE  ARGUMENT  PARSER
 parser  =  argparse.ArgumentParser(description="Query  the  RAG  pipeline  with  a  specific  question.")
 parser.add_argument("question",  type=str,  help="The  question  you  want  to  ask.")
+parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/app/chroma_db"), help="Path to ChromaDB")
+parser.add_argument("--storage-path", type=str, default=os.getenv("RAG_STORAGE_PATH", "/app/storage"), help="Path to storage")
 args  =  parser.parse_args()
 question  =  args.question
+DB_PATH = args.db_path
+STORAGE_PATH = args.storage_path
 
 #  2.  GET  LLM  SERVER  ADDRESS  FROM  ENVIRONMENT  VARIABLE
 LLM_API_BASE  =  os.getenv("LLM_API_BASE")
@@ -45,7 +49,7 @@ try:
     db  =  chromadb.PersistentClient(path=db_path)
     chroma_collection  =  db.get_or_create_collection("my_collection")
     vector_store  =  ChromaVectorStore(chroma_collection=chroma_collection)
-    storage_context  =  StorageContext.from_defaults(persist_dir=storage_path, vector_store=vector_store)
+    storage_context  =  StorageContext.from_defaults(persist_dir=STORAGE_PATH, vector_store=vector_store)
 
     index  =  load_index_from_storage(storage_context)
 except Exception  as e:
