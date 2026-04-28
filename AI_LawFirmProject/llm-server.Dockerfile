@@ -1,29 +1,32 @@
-#  llm-server.Dockerfile  -  Final  Single-Stage  Build
+#  llm-server.Dockerfile  -  Multi-Stage Build
 
-FROM debian:bullseye
+# --- Build Stage ---
+FROM debian:bullseye AS builder
 
-#  1.  Install  all  build  and  runtime  dependencies  in  one  go
-RUN apt-get  update  &&  apt-get  install  -y  --no-install-recommends  \
-    git  \
-    cmake  \
-    build-essential  \
-    ca-certificates  \
-    libgomp1
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git \
+    cmake \
+    build-essential \
+    ca-certificates
 
-#  2.  Clone  the  llama.cpp  repository
-RUN git  clone https://github.com/ggerganov/llama.cpp.git
-
+RUN git clone https://github.com/ggerganov/llama.cpp.git /llama.cpp
 WORKDIR /llama.cpp
 
-#  3.  Build  the  code.  The  BUILD_SHARED_LIBS=OFF  flag  is  crucial.
-RUN mkdir  build  &&  cd build  &&  \
-    cmake  ..  -DLLAMA_CURL=OFF  -DBUILD_SHARED_LIBS=OFF  &&  \
-    cmake  --build  .
+RUN mkdir build && cd build && \
+    cmake .. -DLLAMA_CURL=OFF -DBUILD_SHARED_LIBS=OFF && \
+    cmake --build .
 
-#  4.  Set  up  the  runtime  environment
+# --- Runtime Stage ---
+FROM debian:bullseye-slim
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
+
+RUN mkdir /models
 WORKDIR /
-RUN mkdir  /models
 EXPOSE 8080
 
-#  5.  Define  the  program  to  run  when  the  container  starts
-ENTRYPOINT [  "/llama.cpp/build/bin/llama-server" ]
+ENTRYPOINT ["llama-server"]

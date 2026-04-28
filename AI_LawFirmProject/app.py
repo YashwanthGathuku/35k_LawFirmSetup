@@ -1,6 +1,5 @@
 import streamlit  as st
 import requests
-import json
 
 #  IMPORTANT:  This  URL  uses  the  n8n  service  name  from  docker-compose.
 #  The  final  path  segment  must  match  the  production  URL  from  your  n8n  Webhook  node.
@@ -17,7 +16,8 @@ if submit_button  and question:
     with st.spinner("Searching  documents  and  generating  an  answer..."):
         try:
             payload  =  {"question":  question}
-            response  =  requests.post(N8N_WEBHOOK_URL,  json=payload)
+            # Added a timeout of 60 seconds to avoid hanging requests
+            response  =  requests.post(N8N_WEBHOOK_URL,  json=payload, timeout=60)
             response.raise_for_status()
             result  =  response.json()
 
@@ -30,8 +30,13 @@ if submit_button  and question:
                 st.success("Answer:")
                 st.write(answer)
             else:
-                st.error("The  workflow  returned  an  unexpected  response  format.")
-                st.json(result)
+                st.error("The assistant returned an unexpected response format. Please try again.")
+                # Log detailed error for debugging if needed, but don't show all to user
+                # st.json(result)
 
-        except Exception  as e:
-            st.error(f"An  unexpected  error  occurred:  {e}")
+        except requests.exceptions.Timeout:
+            st.error("The request timed out. The model might be busy or the documents are too large.")
+        except requests.exceptions.RequestException:
+            st.error("Could not connect to the assistant service. Please ensure the backend is running.")
+        except Exception:
+            st.error("An unexpected error occurred. Please contact support.")
