@@ -13,8 +13,13 @@ from llama_index.core.postprocessor import SimilarityPostprocessor
 import chromadb
 from srlc_engine import SRLCEngine
 
-#  1.  SETUP  LOGGING
-#  Logs  are  directed  to  stderr  so  stdout  is  reserved  for  the  JSON  output.
+#  1.  SETUP  LOGGING & STDOUT REDIRECTION
+#  We must guarantee that NO external libraries (like transformers or llama-index)
+#  can pollute stdout with progress bars or warnings, which would corrupt the JSON
+#  expected by n8n. We redirect stdout to stderr for the duration of execution.
+original_stdout = sys.stdout
+sys.stdout = sys.stderr
+
 LOG_LEVEL = logging.INFO if os.getenv("RAG_DEBUG_LOGS", "").lower() in ("1", "true", "yes", "on") else logging.WARNING
 logging.basicConfig(stream=sys.stderr,  level=LOG_LEVEL)
 logging.getLogger("llama_index").setLevel(logging.WARNING)
@@ -114,8 +119,13 @@ try:
         "mode": "SRLC" if USE_SRLC else ("CAG" if USE_CAG else "RAG"),
         "model": MODEL_NAME
     }
+
+    # Restore stdout strictly for the final JSON payload
+    sys.stdout = original_stdout
     print(json.dumps(output))
 
 except Exception  as e:
+    # Ensure stdout is restored so n8n can receive the error message if needed
+    sys.stdout = original_stdout
     logging.error(f"Error  during  querying:  {e}")
     sys.exit(1)

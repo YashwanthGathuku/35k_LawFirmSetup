@@ -95,9 +95,38 @@ with st.sidebar:
 st.title("⚖️ Legal Intelligence Portal")
 st.caption(f"Engine: {backend} | Model: {model_name} | Mode: {'SRLC' if use_srlc else 'Standard'}")
 
+# Initialize chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = []
+
+# Display chat messages from history on app rerun
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        # Show thought stream if it exists
+        if message.get("thought_stream"):
+            with st.status("Algorithm Thought Process", expanded=False, state="complete"):
+                for step in message["thought_stream"]:
+                    st.markdown(f"**Step: {step['step']}**")
+                    st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
+
+        st.markdown(message["content"])
+
+        # Show sources if they exist
+        if message.get("sources"):
+            with st.expander(f"📚 Sources & Citations ({len(message['sources'])} verified)"):
+                for src in message["sources"]:
+                    meta = src.get('metadata', {})
+                    file_name = meta.get('file_name')
+                    file_path = meta.get('file_path')
+                    fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
+                    st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
+
 query = st.chat_input("Enter complex legal inquiry...")
 
 if query:
+    # Add user message to chat history
+    st.session_state.messages.append({"role": "user", "content": query})
+
     with st.chat_message("user"):
         st.markdown(query)
 
@@ -157,6 +186,14 @@ if query:
                             file_path = meta.get('file_path')
                             fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
                             st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
+
+                # Add assistant response to chat history
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "content": answer_text if answer_text else "No answer generated.",
+                    "thought_stream": thought_stream,
+                    "sources": sources
+                })
 
             except Exception as e:
                 st.error(f"Error: {e}")
