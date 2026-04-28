@@ -1,61 +1,44 @@
 # LexAI Pro: Project Handover & Continuity Guide
 
-This document provides a comprehensive summary of the LexAI Pro development session. It is designed to allow a new developer or AI agent (like Jules) to pick up the project and continue building without losing context.
+This document provides a comprehensive summary of the LexAI Pro development session and our ultimate architectural goals. It is designed to allow any developer or AI agent (like Jules) to maintain strict alignment with our "20-year leap" vision.
 
-## 📌 Project Overview
-LexAI Pro is a high-fidelity, private Legal Intelligence platform. It enables law firms to perform RAG (Retrieval-Augmented Generation) on their own documents using local LLMs, ensuring 100% data privacy.
+## 📌 Project Overview & Ultimate Goal
+LexAI Pro is evolving from a private RAG platform into an **Artificial Cognitive Legal Entity**. The ultimate goal is a multi-agent orchestration system (MAS) that simulates an entire law firm. It will feature specialized agents for reasoning, skeptical critique, web investigation, and deep knowledge graph memory.
 
-## 🏗️ What Has Been Built
+## 🏗️ What Has Been Built (The Foundation)
 
-### 1. Core Architecture (LexAI v1.0)
-- **Containerized Stack**: Orchestrated via `docker-compose.yml`.
-- **Frontend**: Streamlit dashboard with "Legal Tech" professional styling.
-- **Backend**: n8n workflow engine for document ingestion and query routing.
-- **LLM Serving**: `llama.cpp` (serving GGUF models) and **Ollama** (for dynamic model switching).
-- **RAG Engine**: LlamaIndex + ChromaDB + `sentence-transformers` embeddings.
+### 1. Core Architecture (LexAI v1.0 & v2.0)
+- **Containerized Stack**: Orchestrated via `docker-compose.yml` (Streamlit, n8n, llama.cpp, Ollama).
+- **Deep Ingestion**: LlamaIndex + ChromaDB + Nougat OCR for handling complex legal PDFs.
+- **Security**: Hardened against command injection in the n8n layer using strict shell escaping.
 
-### 2. Advanced Features (LexAI v2.0)
-- **Nougat OCR**: Integration for high-accuracy parsing of complex PDFs (tables, formulas).
-- **Hybrid RAG+CAG**: Support for "Cache-Augmented Generation" to pre-load context and reduce latency.
-- **Source Citations**: UI cards showing filenames, relevance scores, and text snippets for every answer.
-
-### 3. Breakthrough Intelligence (LexAI v3.0)
-- **SRLC Algorithm**: "Self-Reflective Legal Critique" – A 3-step thinking process (Draft -> Critique -> Refine) that allows the AI to review its own work for hallucinations.
-- **Model Hub**: Dynamic discovery of local Ollama models via API.
-- **Live Thought Stream**: Visualizes the AI's internal critique process in the UI.
-
-### 4. Security & Hardening
-- **Zero-Injection Shell**: All user inputs are Base64 encoded before execution in n8n.
-- **Non-Root Execution**: Streamlit container runs as a restricted user.
-- **Output Integrity**: Logging routed to `stderr` to prevent JSON corruption on `stdout`.
-- **Reproducibility**: Pinned Docker tags and shallow git clones.
+### 2. The Bridge to the Future (LexAI v3.0)
+- **SRLC Algorithm**: "Self-Reflective Legal Critique" – The precursor to the "Epistemology Agent".
+- **Agentic Scaffolding**: Initial directories (`/app/agents/`) and blueprints established for LangGraph-based cyclic agent orchestration.
 
 ## 📂 File Structure Key
 - `AI_LawFirmProject/app.py`: The main Streamlit UI.
-- `AI_LawFirmProject/rag_scripts/rag_setup.py`: The document ingestion engine.
-- `AI_LawFirmProject/rag_scripts/query_rag.py`: The primary query & RAG logic.
-- `AI_LawFirmProject/rag_scripts/srlc_engine.py`: The SRLC algorithm implementation.
-- `AI_LawFirmProject/n8n_workflow.json`: The brain of the orchestration (Import this into n8n).
+- `AI_LawFirmProject/rag_scripts/`: Legacy linear RAG scripts (Ingestion & Querying).
+- `AI_LawFirmProject/agents/`: **[NEW]** The core of the cognitive architecture (LangGraph orchestrators, agent definitions, and tools).
+- `AI_LawFirmProject/n8n_workflow.json`: Orchestration layer for triggering events.
+- `ANALYSIS_AND_UPGRADES.md`: The master blueprint detailing the vision, state, and roadmap.
 
-## 🚀 Suggestions for Continuity
+## 🚀 The Master Roadmap (Do Not Deviate)
 
-If you are a new Jules account continuing this work, here are the best next steps:
+To ensure we reach the production-grade, highly advanced final product, focus strictly on these pending milestones:
 
-### 1. Implementation of Evaluation (RAGAS)
-Currently, the "SRLC" algorithm provides qualitative self-critique. Adding **Ragas** or **TruLens** would allow the firm to see quantitative scores (Faithfulness, Relevancy) for every answer.
+### 1. Complete the LangGraph Orchestration
+Transition the core logic from `query_rag.py` into a cyclic graph where the **Reasoning Agent** and **Investigator Agent** can converse, debate, and autonomously search the web before returning a final answer.
 
-### 2. Document "Chat History" Persistence
-The current UI is session-based. Integrating a database (like SQLite or PostgreSQL) via n8n would allow lawyers to return to previous research sessions.
+### 2. Implement the Knowledge Graph
+Move beyond simple vector similarity (ChromaDB) to a Graph Database (like Neo4j) to map the intricate relationships between laws, precedents, and judges.
 
-### 3. Multi-Tenant / User Authentication
-For a real law firm, you'll need to implement an authentication layer (Auth0 or Streamlit-Authenticator) to ensure different lawyers have private silos for their cases.
+### 3. Production Readiness
+Implement robust state management (PostgreSQL/SQLite) for chat persistence, and enterprise-grade multi-tenant authentication.
 
-### 4. Local Embedding Serving
-Currently, embeddings are handled by HuggingFace within the Python scripts. Moving these to a dedicated service (or using Ollama's embedding endpoints) would make the system more modular and faster.
-
-## 💡 How to Continue with a New Jules Account
+## 💡 How to Continue
 When starting a new session, provide this prompt:
-> "I am continuing work on the LexAI Pro project. Please read `HANDOVER_GUIDE.md` and the `AI_LawFirmProject/README.md` to understand the current state. My first goal is to [INSERT GOAL HERE, e.g., Implement Chat History]."
+> "I am continuing work on LexAI Pro. Please read `HANDOVER_GUIDE.md` and `ANALYSIS_AND_UPGRADES.md` to understand our ultimate goal of an Artificial Cognitive Legal Entity. My first goal is to [INSERT GOAL, e.g., Implement the LangGraph Investigator Agent]."
 
 ---
-*Generated by Jules - Your Senior Software Engineer*
+*Maintained by Jules - Aligning with the Future of Legal Tech*
