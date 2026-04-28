@@ -1,0 +1,5 @@
+# Set CADDY_SITE_ADDRESS to your real domain or site address before starting Caddy,
+# for example: example.com or :80 for local/non-TLS use.
+{$CADDY_SITE_ADDRESS} {
+    reverse_proxy streamlit-app:8501
+}
