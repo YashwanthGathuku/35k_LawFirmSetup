@@ -2,6 +2,7 @@ import streamlit as st
 import requests
 import os
 import json
+import html
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -64,7 +65,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Constants ---
-N8N_WEBHOOK_URL = "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8"
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8")
 DOCS_DIR = "/app/docs"
 
 # --- Sidebar ---
@@ -116,13 +117,14 @@ if query:
     with st.chat_message("assistant"):
         with st.spinner("Processing inquiry through LexAI Engine..."):
             try:
-                # Add CAG flag to payload
+                # Add advanced retrieval / ingestion flags to payload
                 payload = {
                     "question": query,
                     "use_cag": use_cag,
+                    "use_nougat": use_nougat,
                     "top_k": top_k
                 }
-                # Note: n8n workflow needs to be updated to pass these flags to the script
+                # Note: n8n workflow should pass these flags through so ingestion can use --nougat when requested
                 response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=120)
                 response.raise_for_status()
                 result = response.json()
@@ -150,14 +152,14 @@ if query:
                     with st.expander(f"🔍 Sources & Citations ({len(sources)} verified)"):
                         for idx, src in enumerate(sources):
                             meta = src.get('metadata', {})
-                            fname = meta.get('file_name', 'Unknown Source')
+                            fname = html.escape(meta.get('file_name', 'Unknown Source'))
                             score = src.get('score', 0)
-                            text = src.get('text', '')
+                            text = html.escape(src.get('text', '')[:400])
 
                             st.markdown(f"""
                             <div class="source-card">
                                 <strong>Source {idx+1}: {fname}</strong> (Relevance: {score:.2f})<br>
-                                <small>"{text[:400]}..."</small>
+                                <small>"{text}..."</small>
                             </div>
                             """, unsafe_allow_html=True)
 

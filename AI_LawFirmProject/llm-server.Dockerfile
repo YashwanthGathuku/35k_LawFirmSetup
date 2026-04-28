@@ -9,7 +9,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     ca-certificates
 
-RUN git clone https://github.com/ggerganov/llama.cpp.git /llama.cpp
+ARG LLAMA_CPP_REF=b4376
+RUN git clone --branch "${LLAMA_CPP_REF}" --depth 1 https://github.com/ggerganov/llama.cpp.git /llama.cpp && \
+    git -C /llama.cpp checkout --detach "${LLAMA_CPP_REF}"
 WORKDIR /llama.cpp
 
 RUN mkdir build && cd build && \

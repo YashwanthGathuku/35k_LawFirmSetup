@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "command": "=python3 /app/rag_scripts/query_rag.py \"{{ $json.body.question.replace(/\"/g, '\\\\\"') }}\" --top-k {{ $json.body.top_k || 3 }} {{ $json.body.use_cag ? '--use-cag' : '' }}"
+        "command": "=QUESTION_B64='{{ Buffer.from(String($json.body.question || ''), 'utf8').toString('base64') }}' python3 /app/rag_scripts/query_rag.py \"$(printf '%s' \"$QUESTION_B64\" | base64 -d)\" --top-k {{ Number.isFinite(Number($json.body.top_k)) ? Math.max(1, Math.floor(Number($json.body.top_k))) : 3 }} {{ $json.body.use_cag ? '--use-cag' : '' }}"
       },
       "type": "n8n-nodes-base.executeCommand",
       "typeVersion": 1,
@@ -95,7 +95,7 @@
     {
       "parameters": {
         "operation": "write",
-        "fileName": "=/app/docs/{{ $json.name }}",
+        "fileName": "=/app/docs/{{ (((($json.name || 'file').split(/[\\\\/]/).pop() || 'file').replace(/[^A-Za-z0-9._-]/g, '_')) || 'file') }}",
         "options": {}
       },
       "type": "n8n-nodes-base.readWriteFile",

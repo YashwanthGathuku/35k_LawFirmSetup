@@ -1,6 +1,6 @@
 services:
   caddy:
-    image: caddy:latest
+    image: caddy:2.8.4
     restart: unless-stopped
     ports:
       - "80:80"
@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     environment:
       - LLM_API_BASE=http://llm-server:8080/v1
-      - N8N_SECURE_COOKIE=false
+      - N8N_SECURE_COOKIE=${N8N_SECURE_COOKIE:-true}
     volumes:
       - ./n8n-data:/home/node/.n8n
       - ./chroma_db:/app/chroma_db
