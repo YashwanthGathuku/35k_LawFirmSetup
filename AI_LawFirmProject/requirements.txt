@@ -24,3 +24,6 @@ ddgs
 psycopg2-binary
 streamlit-authenticator
 sqlalchemy
+pytest
+pytest-cov
+pytest-mock
