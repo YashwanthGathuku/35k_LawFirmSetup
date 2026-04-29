@@ -17,7 +17,7 @@ st.title("Private  AI  Assistant")
 st.info("Ask  a  question  about  your  documents.")
 
 with st.form(key='query_form'):
-    question  =  st.text_input("Your  Question:")
+    question  =  st.text_input("Your  Question:",  max_chars=1000)
     submit_button  =  st.form_submit_button(label='Get  Answer')
 
 if submit_button  and question:
