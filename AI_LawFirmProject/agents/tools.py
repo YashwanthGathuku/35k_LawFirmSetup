@@ -12,11 +12,30 @@ class InvestigatorTools:
     def search_duckduckgo(query: str, max_results: int = 5) -> str:
         """
         A tool to perform open web searches to find legal precedents, news, or statutes.
-        (Placeholder for actual duckduckgo-search or tavily API integration)
+        Uses the `ddgs` library to scrape real-time data from the web.
         """
-        # In a full implementation, we would use duckduckgo_search or similar
-        print(f"[Investigator Tool Executed] Web Search for: {query}")
-        return f"Simulated web search results for '{query}'. Precedent found indicating recent changes in case law."
+        try:
+            try:
+                from ddgs import DDGS
+            except ImportError:
+                from duckduckgo_search import DDGS
+
+            print(f"[Investigator Tool Executed] Live Web Search for: {query}")
+
+            # Use list() to consume the generator
+            results = list(DDGS().text(query, max_results=max_results))
+
+            if not results:
+                return "No search results found."
+
+            formatted_results = []
+            for r in results:
+                formatted_results.append(f"Title: {r.get('title')}\nSnippet: {r.get('body')}\nURL: {r.get('href')}\n---")
+
+            return "\n".join(formatted_results)
+        except Exception as e:
+            print(f"[Investigator Tool Error] Web Search failed: {e}")
+            return f"Error executing web search: {e}"
 
     @staticmethod
     def query_local_knowledge_graph(query: str) -> str:

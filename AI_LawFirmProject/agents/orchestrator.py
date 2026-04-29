@@ -1,8 +1,9 @@
 from typing import TypedDict, Annotated, Sequence, List
 import operator
 import logging
+from langgraph.graph import StateGraph, END
+from AI_LawFirmProject.agents.tools import InvestigatorTools
 
-# Set up logging for the Cognitive Architecture
 logger = logging.getLogger("CognitiveOrchestrator")
 logger.setLevel(logging.INFO)
 
@@ -10,111 +11,146 @@ logger.setLevel(logging.INFO)
 # Define the State for the Multi-Agent Graph
 # ---------------------------------------------------------
 class CognitiveState(TypedDict):
-    """
-    The shared memory/state for the multi-agent system.
-    This replaces the linear prompt-response paradigm.
-    """
+    query: str
+    local_context: str
     messages: Annotated[Sequence[dict], operator.add]
     current_hypothesis: str
     investigation_results: List[str]
     critique_passed: bool
+    iterations: int
 
 # ---------------------------------------------------------
-# Agent Nodes (The "Brain Trust")
+# Graph Nodes
 # ---------------------------------------------------------
+def reasoning_node(state: CognitiveState, llm=None):
+    logger.info("Reasoning Agent: Synthesizing hypothesis...")
+    query = state["query"]
+    context = state["local_context"]
+    external_data = "\n".join(state["investigation_results"])
 
-def reasoning_agent_node(state: CognitiveState):
-    """
-    The 'Senior Partner'. Synthesizes information and forms legal arguments.
-    """
-    logger.info("Reasoning Agent: Formulating initial legal hypothesis...")
-    # TODO: Connect to local LLM via LangChain
+    prompt = f"""
+    You are the Senior Reasoning Agent in a legal firm.
+    Analyze the user's query using the provided local document context and any external investigation data.
 
-    # Simulated logic
-    hypothesis = "Based on initial RAG context, the plaintiff has a strong case under statute X."
+    USER QUERY: {query}
+
+    LOCAL DOCUMENT CONTEXT:
+    {context}
+
+    EXTERNAL INVESTIGATION DATA:
+    {external_data if external_data else 'None yet.'}
+
+    Provide a clear, detailed legal hypothesis or answer based strictly on the provided evidence.
+    """
+
+    if llm:
+        hypothesis = str(llm.complete(prompt))
+    else:
+        # Fallback simulation if LLM not injected
+        if external_data:
+            hypothesis = f"Based on local context and external investigation: {external_data[:100]}... The answer is adjusted."
+        else:
+            hypothesis = "Based purely on local context, this is the initial drafted hypothesis."
 
     return {
         "current_hypothesis": hypothesis,
-        "messages": [{"role": "ReasoningAgent", "content": hypothesis}]
+        "messages": [{"step": "Reasoning Formulation", "content": hypothesis}]
     }
 
-def investigator_agent_node(state: CognitiveState):
+def epistemology_node(state: CognitiveState, llm=None):
+    logger.info("Epistemology Agent: Critiquing hypothesis...")
+    query = state["query"]
+    hypothesis = state["current_hypothesis"]
+
+    if state["iterations"] >= 1:
+        # Pass on the second iteration to avoid infinite loops and limit API calls
+        return {
+            "critique_passed": True,
+            "messages": [{"step": "Epistemology Critique", "content": "Maximum iteration reached. Hypothesis accepted as final."}],
+            "iterations": state["iterations"] + 1
+        }
+
+    prompt = f"""
+    You are the Epistemology Agent (The Skeptic) in a legal firm.
+    Review the proposed hypothesis for the given query.
+    If the hypothesis seems to lack sufficient evidence, hallucinate, or if it explicitly says it doesn't know the answer, you must REJECT it and demand an external investigation.
+    Otherwise, ACCEPT it.
+
+    USER QUERY: {query}
+    PROPOSED HYPOTHESIS: {hypothesis}
+
+    Your response MUST start with either "ACCEPT" or "REJECT", followed by a brief explanation.
     """
-    The 'Junior Clerk / Investigator'.
-    If the reasoning agent lacks certainty, this agent uses tools (web search, graph DB).
-    """
-    logger.info("Investigator Agent: Searching external databases to verify hypothesis...")
-    # TODO: Connect to InvestigatorTools (tools.py)
 
-    # Simulated search
-    found_data = "Recent Supreme Court ruling overturned statute X."
-
-    return {
-        "investigation_results": [found_data],
-        "messages": [{"role": "InvestigatorAgent", "content": found_data}]
-    }
-
-def epistemology_agent_node(state: CognitiveState):
-    """
-    The 'Skeptic'. Critiques the Reasoning Agent's hypothesis using the Investigator's data.
-    If it fails, it routes back to Reasoning.
-    """
-    logger.info("Epistemology Agent: Critiquing hypothesis against evidence...")
-
-    hypothesis = state.get("current_hypothesis", "")
-    evidence = state.get("investigation_results", [])
-
-    # Simulated critique logic
-    if "overturned" in str(evidence):
-        logger.warning("Epistemology Agent: REJECTED. Hypothesis relies on overturned statute.")
-        passed = False
+    if llm:
+        response = str(llm.complete(prompt))
+        passed = response.strip().upper().startswith("ACCEPT")
+        critique = response
     else:
-        logger.info("Epistemology Agent: APPROVED. Hypothesis is legally sound.")
-        passed = True
+        # Simulated critique
+        passed = False
+        critique = "REJECT. Hypothesis lacks external verification. I recommend investigating recent case law."
 
     return {
         "critique_passed": passed,
-        "messages": [{"role": "EpistemologyAgent", "content": f"Critique Passed: {passed}"}]
+        "messages": [{"step": "Epistemology Critique", "content": critique}],
+        "iterations": state["iterations"] + 1
+    }
+
+def investigator_node(state: CognitiveState):
+    logger.info("Investigator Agent: Searching external databases...")
+    query = state["query"]
+
+    # Call the actual web search tool
+    search_results = InvestigatorTools.search_duckduckgo(query, max_results=2)
+
+    return {
+        "investigation_results": [search_results],
+        "messages": [{"step": "Investigation", "content": f"Found external data: {search_results[:100]}..."}]
     }
 
 # ---------------------------------------------------------
-# Graph Orchestration (Placeholder for LangGraph)
+# Edge Routing
 # ---------------------------------------------------------
-def run_cognitive_cycle(initial_query: str):
-    """
-    Simulates the LangGraph cyclic orchestration.
-    In the final version, this will use `StateGraph` from `langgraph.graph`.
-    """
-    state: CognitiveState = {
-        "messages": [{"role": "user", "content": initial_query}],
+def route_after_critique(state: CognitiveState):
+    if state["critique_passed"]:
+        return END
+    else:
+        return "investigator"
+
+# ---------------------------------------------------------
+# Graph Orchestration
+# ---------------------------------------------------------
+def build_cognitive_graph(llm=None):
+    workflow = StateGraph(CognitiveState)
+
+    # We use functools.partial or lambdas to inject the LLM into the nodes
+    workflow.add_node("reasoner", lambda state: reasoning_node(state, llm))
+    workflow.add_node("epistemologist", lambda state: epistemology_node(state, llm))
+    workflow.add_node("investigator", investigator_node)
+
+    workflow.set_entry_point("reasoner")
+    workflow.add_edge("reasoner", "epistemologist")
+    workflow.add_conditional_edges("epistemologist", route_after_critique)
+    workflow.add_edge("investigator", "reasoner")
+
+    return workflow.compile()
+
+def run_cognitive_cycle(query: str, local_context: str = "", llm=None) -> dict:
+    graph = build_cognitive_graph(llm)
+    initial_state = {
+        "query": query,
+        "local_context": local_context,
+        "messages": [],
         "current_hypothesis": "",
         "investigation_results": [],
-        "critique_passed": False
+        "critique_passed": False,
+        "iterations": 0
     }
 
-    logger.info(f"--- STARTING COGNITIVE CYCLE FOR QUERY: '{initial_query}' ---")
-
-    # Step 1: Reason
-    state.update(reasoning_agent_node(state))
-
-    # Step 2: Investigate
-    state.update(investigator_agent_node(state))
-
-    # Step 3: Critique (Epistemology)
-    state.update(epistemology_agent_node(state))
-
-    # Step 4: Conditional Routing (Cyclic part)
-    if not state["critique_passed"]:
-        logger.info("Orchestrator: Routing back to Reasoning Agent due to failed critique.")
-        # In a real LangGraph, we would route back. Here we just simulate a second pass.
-        state["current_hypothesis"] = "Revised hypothesis: Plaintiff must rely on common law, as statute X is overturned."
-        state["critique_passed"] = True
-
-    logger.info("--- COGNITIVE CYCLE COMPLETE ---")
-    return state["current_hypothesis"]
-
-if __name__ == "__main__":
-    # Test the scaffolding
-    logging.basicConfig(level=logging.INFO)
-    final_answer = run_cognitive_cycle("Does statute X apply to my AI copyright case?")
-    print(f"\nFinal Verified Output: {final_answer}")
+    # Invoke the graph (using config recursion_limit to be safe)
+    final_state = graph.invoke(initial_state, {"recursion_limit": 10})
+    return {
+        "answer": final_state["current_hypothesis"],
+        "thought_stream": final_state["messages"]
+    }

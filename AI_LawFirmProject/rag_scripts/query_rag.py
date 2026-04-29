@@ -11,7 +11,11 @@ from llama_index.llms.openai  import OpenAI
 from llama_index.llms.ollama import Ollama
 from llama_index.core.postprocessor import SimilarityPostprocessor
 import chromadb
-from srlc_engine import SRLCEngine
+import sys
+import os
+# Adjust sys.path to allow importing from the parent directory
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+from agents.orchestrator import run_cognitive_cycle
 
 #  1.  SETUP  LOGGING & STDOUT REDIRECTION
 #  We must guarantee that NO external libraries (like transformers or llama-index)
@@ -87,14 +91,11 @@ try:
     thought_stream = []
 
     if USE_SRLC:
-        srlc = SRLCEngine(llm)
-        srlc_result = srlc.run(question, context_str)
-        answer = srlc_result["final"]
-        thought_stream = [
-            {"step": "Drafting", "content": srlc_result["draft"]},
-            {"step": "Self-Critique", "content": srlc_result["critique"]},
-            {"step": "Refining", "content": srlc_result["final"]}
-        ]
+        # We now map "USE_SRLC" to our new advanced Multi-Agent Cognitive Architecture.
+        # This replaces the old linear SRLC engine.
+        cognitive_result = run_cognitive_cycle(query=question, local_context=context_str, llm=llm)
+        answer = cognitive_result["answer"]
+        thought_stream = cognitive_result["thought_stream"]
     elif USE_CAG:
         cag_prompt = f"[CACHED LEGAL KNOWLEDGE]\n{context_str}\n\nQuestion: {question}"
         answer = str(llm.complete(cag_prompt))
