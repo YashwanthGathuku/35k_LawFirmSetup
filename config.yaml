@@ -1,0 +1,25 @@
+# =============================================================================
+# Authentication Configuration
+# =============================================================================
+# IMPORTANT: In production, replace these hashed passwords with your own.
+# Generate a bcrypt hash:
+#   python3 -c "import bcrypt; print(bcrypt.hashpw(b'YOUR_PASSWORD', bcrypt.gensalt()).decode())"
+#
+# These are PLACEHOLDER credentials. Change them before deployment.
+credentials:
+  usernames:
+    admin:
+      email: admin@tegifa.local
+      name: Admin
+      password: $2b$12$PLACEHOLDER_GENERATE_YOUR_OWN_HASH_HERE_00000000000000
+    partner:
+      email: partner@tegifa.local
+      name: Senior Partner
+      password: $2b$12$PLACEHOLDER_GENERATE_YOUR_OWN_HASH_HERE_00000000000000
+cookie:
+  expiry_days: 1
+  # MUST be overridden via AUTH_COOKIE_KEY env var in production
+  key: OVERRIDE_VIA_ENV_VAR
+  name: tegifa_session
+pre-authorized:
+  emails: []

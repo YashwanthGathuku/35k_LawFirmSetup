@@ -1,0 +1,41 @@
+# =============================================================================
+# Tegifa Legal — Runtime Dependencies
+# =============================================================================
+
+# --- Web Framework ---
+streamlit
+streamlit-authenticator
+requests
+
+# --- RAG Pipeline ---
+llama-index
+llama-index-vector-stores-chroma
+llama-index-embeddings-huggingface
+llama-index-llms-openai
+llama-index-llms-ollama
+chromadb
+sentence-transformers
+pypdf
+
+# --- Text Processing ---
+torch
+transformers
+
+# --- Multi-Agent Architecture ---
+langgraph
+langchain
+duckduckgo-search
+ddgs
+
+# --- Knowledge Graph ---
+neo4j
+
+# --- Database ---
+sqlalchemy
+
+# --- Deep Ingestion (optional) ---
+# llama-index-readers-nougat-ocr
+
+# --- HTTP ---
+pydantic
+httpx
