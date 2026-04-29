@@ -12,7 +12,7 @@ import logging
 import yaml
 from yaml.loader import SafeLoader
 
-from db.persistence import save_chat_session, load_chat_session
+from db.persistence import save_chat_session, load_chat_session, list_case_sessions
 from rag_scripts.query_rag import init_llm, init_index, execute_query
 
 logging.basicConfig(level=logging.INFO)
@@ -91,6 +91,8 @@ STORAGE_PATH = os.getenv("RAG_STORAGE_PATH", "/app/storage")
 SIDEBAR_ICON_PATH = os.getenv("SIDEBAR_ICON_PATH", "/app/assets/sidebar-icon.png")
 MAX_QUESTION_LENGTH = 1000
 MAX_TOP_K = 10
+PRIVACY_MODE_STRICT = os.getenv("PRIVACY_MODE_STRICT", "false").lower() in {"1", "true", "yes", "on"}
+
 
 
 def sanitize_html(text: str) -> str:
@@ -133,6 +135,18 @@ with st.sidebar:
             model_name = "llama3"
     else:
         model_name = "local-llama-cpp"
+
+    st.markdown("---")
+    try:
+        existing_cases = list_case_sessions(username)
+    except Exception as e:
+        logger.error("Failed to list case sessions: %s", e)
+        existing_cases = []
+    new_case = st.text_input("New case session", value="")
+    case_options = existing_cases or ["Default Case"]
+    if new_case.strip() and new_case.strip() not in case_options:
+        case_options = [new_case.strip()] + case_options
+    selected_case = st.selectbox("Case session", case_options, key="selected_case")
 
     st.markdown("---")
     st.subheader("🔬 Advanced Logic")
@@ -178,11 +192,15 @@ def load_rag_pipeline(backend_type: str, model: str):
 # --- Main UI ---
 st.title("⚖️ Legal Intelligence Portal")
 st.caption(f"Engine: {backend} | Model: {model_name} | Mode: {'SRLC' if use_srlc else 'Standard'}")
+if PRIVACY_MODE_STRICT:
+    st.warning('🔒 External search disabled (PRIVACY_MODE_STRICT=true).')
 
-# Initialize chat history (only on first load)
-if "messages" not in st.session_state:
+# Reload chat history when the selected case changes or on first load
+_current_case = st.session_state.get("selected_case", "Default Case")
+if "messages" not in st.session_state or st.session_state.get("_last_loaded_case") != _current_case:
     try:
-        st.session_state.messages = load_chat_session(username)
+        st.session_state.messages = load_chat_session(username, _current_case)
+        st.session_state._last_loaded_case = _current_case
     except Exception as e:
         logger.error("Failed to load chat history: %s", e)
         st.session_state.messages = []
@@ -286,7 +304,7 @@ if query:
                     })
 
                     try:
-                        save_chat_session(username, st.session_state.messages)
+                        save_chat_session(username, st.session_state.get("selected_case", "Default Case"), st.session_state.messages)
                     except Exception as e:
                         logger.error("Failed to save chat: %s", e)
                         st.error(f"Failed to save to database: {e}")

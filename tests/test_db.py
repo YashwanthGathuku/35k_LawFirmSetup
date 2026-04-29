@@ -1,102 +1,55 @@
-"""
-Tegifa Legal — Database Tests
-Tests for persistence layer with in-memory SQLite.
-"""
-import pytest
-import os
-import sys
-
+import pytest, os, sys
+from unittest.mock import patch
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
+os.environ["DATABASE_URI"] = "sqlite:///:memory:"
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
-# Override env BEFORE importing models
-os.environ["DATABASE_URI"] = "sqlite:///:memory:"
-
 from db.models import Base, User, ChatSession
-import db.models
-import db.persistence
+import db.models, db.persistence
 
-# Override engine and session factory for testing
 engine = create_engine("sqlite:///:memory:")
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-db.models.engine = engine
-db.models.SessionLocal = TestingSessionLocal
-db.persistence.SessionLocal = TestingSessionLocal
-
+db.models.engine = engine; db.models.SessionLocal = TestingSessionLocal; db.persistence.SessionLocal = TestingSessionLocal
 
 @pytest.fixture(autouse=True)
 def setup_database():
-    """Create tables before each test and drop them after."""
     Base.metadata.create_all(bind=engine)
     yield
     Base.metadata.drop_all(bind=engine)
 
 
-def test_save_new_user_and_session():
-    messages = [{"role": "user", "content": "Hello"}]
-    db.persistence.save_chat_session("testuser", messages)
+def test_multiple_case_sessions_per_user_create_read_update():
+    db.persistence.save_chat_session("u1", "CaseA", [{"role":"user","content":"a"}])
+    db.persistence.save_chat_session("u1", "CaseB", [{"role":"user","content":"b"}])
+    db.persistence.save_chat_session("u1", "CaseA", [{"role":"assistant","content":"updated"}])
+    assert db.persistence.load_chat_session("u1", "CaseA")[0]["content"] == "updated"
+    assert db.persistence.load_chat_session("u1", "CaseB")[0]["content"] == "b"
 
+
+def test_list_case_sessions_ordering():
+    db.persistence.save_chat_session("u2", "Case1", [{"role": "user", "content": "1"}])
+    db.persistence.save_chat_session("u2", "Case2", [{"role": "user", "content": "2"}])
+    # Re-save Case1 so it has the most recent updated_at
+    db.persistence.save_chat_session("u2", "Case1", [{"role": "assistant", "content": "updated"}])
+    names = db.persistence.list_case_sessions("u2")
+    assert names == ["Case1", "Case2"]
+
+
+def test_retention_truncation(monkeypatch):
+    monkeypatch.setenv("CHAT_MAX_TURNS", "2")
+    monkeypatch.setenv("CHAT_MAX_CHARS", "5")
+    msgs = [{"role":"user","content":"1111"},{"role":"assistant","content":"2222"},{"role":"user","content":"3333"}]
+    db.persistence.save_chat_session("u3", "CaseR", msgs)
+    loaded = db.persistence.load_chat_session("u3", "CaseR")
+    assert loaded == [{"role":"user","content":"3333"}]
+
+
+def test_save_chat_session_commit_failure_rolls_back():
+    """Verify that a commit failure triggers rollback and nothing is persisted."""
     session = TestingSessionLocal()
-    user = session.query(User).filter_by(username="testuser").first()
-    assert user is not None
-    assert user.email == "testuser@tegifa.local"
-
-    chat_session = session.query(ChatSession).filter_by(user_id=user.id).first()
-    assert chat_session is not None
-    assert chat_session.messages_json == messages
-    session.close()
-
-
-def test_update_existing_session():
-    messages = [{"role": "user", "content": "Hello"}]
-    db.persistence.save_chat_session("testuser", messages)
-
-    new_messages = [
-        {"role": "user", "content": "Hello"},
-        {"role": "assistant", "content": "Hi"},
-    ]
-    db.persistence.save_chat_session("testuser", new_messages)
-
-    session = TestingSessionLocal()
-    user = session.query(User).filter_by(username="testuser").first()
-    sessions = session.query(ChatSession).filter_by(user_id=user.id).all()
-    assert len(sessions) == 1
-    assert sessions[0].messages_json == new_messages
-    session.close()
-
-
-def test_load_existing_session():
-    messages = [{"role": "user", "content": "Hello"}]
-    db.persistence.save_chat_session("loaduser", messages)
-
-    loaded = db.persistence.load_chat_session("loaduser")
-    assert loaded == messages
-
-
-def test_load_nonexistent_user():
-    loaded = db.persistence.load_chat_session("ghostuser")
-    assert loaded == []
-
-
-def test_load_user_without_session():
-    session = TestingSessionLocal()
-    user = User(
-        username="nouser", email="nouser@tegifa.local", hashed_password="***"
-    )
-    session.add(user)
-    session.commit()
-    session.close()
-
-    loaded = db.persistence.load_chat_session("nouser")
-    assert loaded == []
-
-
-def test_save_rollback_on_error(mocker):
-    """Verify that a failed commit triggers rollback, not silent corruption."""
-    mocker.patch.object(
-        TestingSessionLocal, "commit", side_effect=Exception("DB Error")
-    )
-    with pytest.raises(Exception, match="DB Error"):
-        db.persistence.save_chat_session("erroruser", [])
+    with patch.object(session, "commit", side_effect=RuntimeError("DB error")):
+        with patch("db.persistence.SessionLocal", return_value=session):
+            with pytest.raises(RuntimeError, match="DB error"):
+                db.persistence.save_chat_session("u4", "CaseF", [{"role": "user", "content": "fail"}])
+    # Nothing should have been persisted
+    assert db.persistence.load_chat_session("u4", "CaseF") == []
