@@ -1,52 +1,243 @@
-import os
-import streamlit  as st
+import streamlit as st
+import streamlit_authenticator as stauth
 import requests
+import os
+import json
+import yaml
+from yaml.loader import SafeLoader
+from db.persistence import save_chat_session, load_chat_session
 
-#  IMPORTANT:  This  URL  uses  the  n8n  service  name  from  docker-compose.
-#  The  final  path  segment  must  match  the  production  URL  from  your  n8n  Webhook  node.
-#  Override  by  setting  the  N8N_WEBHOOK_URL  environment  variable.
-N8N_WEBHOOK_URL  =  os.getenv(
-    "N8N_WEBHOOK_URL",
-    "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8"
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="LexAI Pro v3.0 - breakthrough Intelligence",
+    page_icon="⚖️",
+    layout="wide",
+    initial_sidebar_state="expanded",
 )
 
+# --- Custom CSS ---
+st.markdown("""
+<style>
+    :root {
+        --primary-color: #1E3A8A;
+        --accent-gold: #D4AF37;
+    }
+    .thought-bubble {
+        background-color: #F1F5F9;
+        padding: 15px;
+        border-radius: 10px;
+        border-left: 5px solid var(--accent-gold);
+        margin: 10px 0;
+        font-family: 'Courier New', Courier, monospace;
+        font-size: 0.9rem;
+    }
+    .source-card {
+        background-color: white;
+        padding: 12px;
+        border-radius: 8px;
+        border: 1px solid #E2E8F0;
+        margin-bottom: 8px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
+# --- Auth Setup ---
+with open('config.yaml') as file:
+    config = yaml.load(file, Loader=SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['pre-authorized']
+)
+
+name, authentication_status, username = authenticator.login('Login', 'main')
+
+if authentication_status == False:
+    st.error('Username/password is incorrect')
+    st.stop()
+elif authentication_status == None:
+    st.warning('Please enter your username and password')
+    st.stop()
+
+# --- Constants & Helpers ---
+N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
+DOCS_DIR = os.getenv("DOCS_DIR", "/app/docs")
+SIDEBAR_ICON_PATH = os.getenv("SIDEBAR_ICON_PATH", "/app/assets/sidebar-icon.png")
 MAX_QUESTION_LENGTH = 1000
 
 if not isinstance(N8N_WEBHOOK_URL, str) or not N8N_WEBHOOK_URL.strip() or not N8N_WEBHOOK_URL.startswith(("http://", "https://")):
     raise ValueError("N8N_WEBHOOK_URL must be a non-empty http(s) URL.")
 
-st.title("Private  AI  Assistant")
-st.info("Ask  a  question  about  your  documents.")
+def get_ollama_models():
+    try:
+        response = requests.get(f"{OLLAMA_HOST}/api/tags", timeout=5)
+        if response.status_code == 200:
+            return [m['name'] for m in response.json().get('models', [])]
+    except:
+        pass
+    return []
 
-with st.form(key='query_form'):
-    question = st.text_input("Your Question:", max_chars=MAX_QUESTION_LENGTH).strip()
-    submit_button  =  st.form_submit_button(label='Get  Answer')
-
-if submit_button and question:
-    if len(question) > MAX_QUESTION_LENGTH:
-        st.error("Your question exceeds the 1000-character limit. Please shorten it and try again.")
+# --- Sidebar ---
+with st.sidebar:
+    if os.path.exists(SIDEBAR_ICON_PATH):
+        st.image(SIDEBAR_ICON_PATH, width=100)
     else:
-        with st.spinner("Searching  documents  and  generating  an  answer..."):
+        st.markdown("## ⚖️")
+
+    st.title("LexAI Pro v3.0")
+    st.markdown(f"Welcome, **{name}**")
+    authenticator.logout('Logout', 'sidebar')
+    st.markdown("---")
+
+    st.subheader("🤖 Model Hub")
+    backend = st.selectbox("Backend Engine", ["llama.cpp", "ollama"])
+
+    ollama_models = get_ollama_models()
+    if backend == "ollama":
+        if ollama_models:
+            model_name = st.selectbox("Choose Local Model", ollama_models)
+        else:
+            st.warning("No Ollama models found. Pull some via CLI!")
+            model_name = "llama3"
+    else:
+        model_name = "local-llama-cpp"
+
+    st.markdown("---")
+    st.subheader("🔬 Advanced Logic")
+    use_srlc = st.toggle("Self-Reflective Critique (SRLC)", value=True, help="Breakthrough algorithm that makes the AI review and correct its own answers.")
+    use_cag = st.toggle("CAG Optimization", value=False)
+    use_nougat = st.toggle("Deep Ingestion (Nougat)", value=False)
+
+    st.markdown("---")
+    if st.button("🔄 Sync & Re-index Docs"):
+        with st.spinner("Requesting knowledge base sync..."):
             try:
-                payload  =  {"question":  question}
-                response  =  requests.post(N8N_WEBHOOK_URL,  json=payload,  timeout=120)
-                response.raise_for_status()
-                result  =  response.json()
+                # Trigger ingestion by passing an 'ingest' flag
+                requests.post(N8N_WEBHOOK_URL, json={"ingest": True, "use_nougat": use_nougat}, timeout=10)
+                st.success("Re-indexing started.")
+            except Exception as e:
+                st.error(f"Sync request failed: {e}")
 
-                if result  and isinstance(result,  list)  and len(result)  >  0 and 'stdout' in result[0]:
-                    answer  =  result[0]['stdout']
-                    st.success("Answer:")
-                    st.write(answer)
-                elif isinstance(result, dict) and 'answer' in result:
-                    answer = result['answer']
-                    st.success("Answer:")
-                    st.write(answer)
-                else:
-                    st.error("The assistant returned an unexpected response format. Please try again.")
-                    # Log detailed error for debugging if needed, but don't show all to user
-                    # st.json(result)
+# --- Main UI ---
+st.title("⚖️ Legal Intelligence Portal")
+st.caption(f"Engine: {backend} | Model: {model_name} | Mode: {'SRLC' if use_srlc else 'Standard'}")
 
-            except requests.exceptions.Timeout:
-                st.error("The request timed out. The workflow may be stalled. Please try again.")
-            except Exception  as e:
-                st.error(f"An  unexpected  error  occurred:  {e}")
+# Initialize chat history
+if "messages" not in st.session_state:
+    try:
+        st.session_state.messages = load_chat_session(username)
+    except Exception as e:
+        st.error(f"Failed to load DB memory: {e}")
+        st.session_state.messages = []
+
+# Display chat messages from history on app rerun
+for message in st.session_state.messages:
+    with st.chat_message(message["role"]):
+        # Show thought stream if it exists
+        if message.get("thought_stream"):
+            with st.status("Algorithm Thought Process", expanded=False, state="complete"):
+                for step in message["thought_stream"]:
+                    st.markdown(f"**Step: {step['step']}**")
+                    st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
+
+        st.markdown(message["content"])
+
+        # Show sources if they exist
+        if message.get("sources"):
+            with st.expander(f"📚 Sources & Citations ({len(message['sources'])} verified)"):
+                for src in message["sources"]:
+                    meta = src.get('metadata', {})
+                    file_name = meta.get('file_name')
+                    file_path = meta.get('file_path')
+                    fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
+                    st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
+
+query = st.chat_input("Enter complex legal inquiry...")
+
+if query:
+    if len(query) > MAX_QUESTION_LENGTH:
+        st.error(f"Your question exceeds the {MAX_QUESTION_LENGTH}-character limit. Please shorten it and try again.")
+    else:
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": query})
+
+        with st.chat_message("user"):
+            st.markdown(query)
+
+        with st.chat_message("assistant"):
+            with st.spinner("LexAI is thinking (Self-Reflective Algorithm Active)..."):
+                try:
+                    payload = {
+                        "question": query,
+                        "use_cag": use_cag,
+                        "use_srlc": use_srlc,
+                        "model_type": backend,
+                        "model_name": model_name
+                    }
+                    response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=240)
+                    response.raise_for_status()
+                    result = response.json()
+
+                    # Check for direct answer from webhook (backward compatibility)
+                    answer_text = ""
+                    sources = []
+                    thought_stream = []
+
+                    if isinstance(result, list) and len(result) > 0:
+                        raw_stdout = result[0].get('stdout', '')
+                        answer_text = result[0].get('answer', '')
+                    else:
+                        raw_stdout = result.get('stdout', '')
+                        answer_text = result.get('answer', '')
+
+                    # If raw_stdout contains JSON, parse it for advanced data
+                    if raw_stdout:
+                        try:
+                            data = json.loads(raw_stdout)
+                            answer_text = data.get("answer", answer_text)
+                            sources = data.get("sources", [])
+                            thought_stream = data.get("thought_stream", [])
+                        except json.JSONDecodeError:
+                            # Fallback to treat raw_stdout as plain text answer if not JSON
+                            if not answer_text:
+                                answer_text = raw_stdout
+
+                    # Show Thought Stream
+                    if thought_stream:
+                        with st.status("Algorithm Thought Process", expanded=False) as status:
+                            for step in thought_stream:
+                                st.markdown(f"**Step: {step['step']}**")
+                                st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
+                            status.update(label="Critique & Refinement Complete", state="complete")
+
+                    st.markdown(answer_text if answer_text else "No answer generated.")
+
+                    if sources:
+                        with st.expander(f"📚 Sources & Citations ({len(sources)} verified)"):
+                            for src in sources:
+                                meta = src.get('metadata', {})
+                                file_name = meta.get('file_name')
+                                file_path = meta.get('file_path')
+                                fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
+                                st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
+
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": answer_text if answer_text else "No answer generated.",
+                        "thought_stream": thought_stream,
+                        "sources": sources
+                    })
+
+                    # Persist to enterprise database
+                    try:
+                        save_chat_session(username, st.session_state.messages)
+                    except Exception as e:
+                        st.error(f"Failed to save to database: {e}")
+
+                except Exception as e:
+                    st.error(f"Error: {e}")

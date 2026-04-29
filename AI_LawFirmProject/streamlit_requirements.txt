@@ -1,2 +1,5 @@
-streamlit==1.39.0
-requests==2.32.3
+streamlit
+requests
+streamlit-authenticator
+sqlalchemy
+psycopg2-binary
