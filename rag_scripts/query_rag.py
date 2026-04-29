@@ -5,6 +5,7 @@ Designed for both programmatic use (from Streamlit) and CLI execution (from n8n/
 """
 import os
 import sys
+import re
 import argparse
 import logging
 import json
@@ -21,7 +22,15 @@ from llama_index.llms.openai import OpenAI
 from llama_index.llms.ollama import Ollama
 import chromadb
 
-logger = logging.getLogger("tegifa.query")
+_INJECTION_PATTERNS = re.compile(
+    r"(ignore\s+previous\s+instructions|system\s+prompt|developer\s+message|execute)",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_context(text: str, max_len: int = 4000) -> str:
+    """Redact known prompt-injection phrases (case-insensitive) and truncate."""
+    return _INJECTION_PATTERNS.sub("[redacted]", text)[:max_len]
 
 
 def init_llm(model_type: str, model_name: str, ollama_host: str, llm_api_base: str):
@@ -82,7 +91,7 @@ def execute_query(
     retriever = index.as_retriever(similarity_top_k=top_k * (2 if use_cag else 1))
     nodes = retriever.retrieve(question)
     raw_context = "\n\n".join([n.node.get_content() for n in nodes])
-    context_str = raw_context.replace("ignore previous instructions", "[redacted]")[:4000]
+    context_str = _sanitize_context(raw_context)
 
     thought_stream = []
 

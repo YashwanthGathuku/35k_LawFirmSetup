@@ -26,12 +26,23 @@ def test_execute_query_standard_rag():
     mock_index.as_query_engine.return_value = mock_query_engine
     result = execute_query("What is statute?", mock_index, MagicMock())
     assert result["answer"] == "Standard RAG Answer"
+    assert result["mode"] == "RAG"
+    assert len(result["sources"]) == 1
+    assert result["sources"][0]["metadata"] == {"file_name": "test_brief.pdf"}
+    assert result["sources"][0]["score"] == pytest.approx(0.95)
 
 
 def test_execute_query_cag_mode():
-    mock_index = _make_mock_index(); mock_llm = MagicMock(); mock_llm.complete.return_value = "CAG Answer"
+    mock_index = _make_mock_index()
+    mock_llm = MagicMock()
+    mock_llm.complete.return_value = "CAG Answer"
     result = execute_query("What is ruling?", mock_index, mock_llm, use_cag=True)
     assert result["mode"] == "CAG"
+    assert result["answer"] == "CAG Answer"
+    # Verify CAG prompt contains untrusted delimiters
+    prompt_used = mock_llm.complete.call_args[0][0]
+    assert "[UNTRUSTED CACHED LEGAL KNOWLEDGE START]" in prompt_used
+    assert "[UNTRUSTED CACHED LEGAL KNOWLEDGE END]" in prompt_used
 
 
 def test_execute_query_srlc_mode_dependency_injection():

@@ -1,6 +1,7 @@
 """Tegifa Legal — Cognitive Orchestrator."""
 from typing import TypedDict, Annotated, Sequence, List
 import operator
+import re
 import logging
 from langgraph.graph import StateGraph, END
 from agents.tools import InvestigatorTools, is_privacy_mode_strict
@@ -14,12 +15,14 @@ GUARDRAIL = (
 )
 
 
+_RISKY_PATTERN = re.compile(
+    r"(ignore\s+previous\s+instructions|system\s+prompt|developer\s+message|execute)",
+    re.IGNORECASE,
+)
+
+
 def _sanitize_external_snippet(text: str, max_len: int = 1200) -> str:
-    risky = ["ignore previous instructions", "system prompt", "developer message", "execute"]
-    cleaned = text
-    for p in risky:
-        cleaned = cleaned.replace(p, "[redacted]").replace(p.title(), "[redacted]")
-    return cleaned[:max_len]
+    return _RISKY_PATTERN.sub("[redacted]", text)[:max_len]
 
 
 class CognitiveState(TypedDict):

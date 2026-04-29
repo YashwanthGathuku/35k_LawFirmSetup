@@ -41,6 +41,7 @@ class InvestigatorTools:
             from agents.graph_builder import kg_manager
             return kg_manager.query_relationships(entity_name)
         except Exception:
+            logger.exception("Knowledge graph query failed for entity: %s", entity_name)
             return "Knowledge Graph is currently unavailable."
 
     @staticmethod

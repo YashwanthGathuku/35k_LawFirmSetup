@@ -7,9 +7,20 @@ from .models import SessionLocal, User, ChatSession
 logger = logging.getLogger("tegifa.persistence")
 
 
+def _get_non_negative_env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        logger.warning("Invalid value for %s; using default %d.", name, default)
+        return default
+
+
 def _get_retention_limits() -> tuple[int, int]:
-    max_turns = int(os.getenv("CHAT_MAX_TURNS", "20"))
-    max_chars = int(os.getenv("CHAT_MAX_CHARS", "20000"))
+    max_turns = _get_non_negative_env_int("CHAT_MAX_TURNS", 20)
+    max_chars = _get_non_negative_env_int("CHAT_MAX_CHARS", 20000)
     return max_turns, max_chars
 
 

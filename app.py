@@ -137,7 +137,11 @@ with st.sidebar:
         model_name = "local-llama-cpp"
 
     st.markdown("---")
-    existing_cases = list_case_sessions(username)
+    try:
+        existing_cases = list_case_sessions(username)
+    except Exception as _e:
+        logger.error("Failed to list case sessions: %s", _e)
+        existing_cases = []
     new_case = st.text_input("New case session", value="")
     case_options = existing_cases or ["Default Case"]
     if new_case.strip() and new_case.strip() not in case_options:
@@ -191,10 +195,12 @@ st.caption(f"Engine: {backend} | Model: {model_name} | Mode: {'SRLC' if use_srlc
 if PRIVACY_MODE_STRICT:
     st.warning('🔒 External search disabled (PRIVACY_MODE_STRICT=true).')
 
-# Initialize chat history (only on first load)
-if "messages" not in st.session_state:
+# Reload chat history when the selected case changes or on first load
+_current_case = st.session_state.get("selected_case", "Default Case")
+if "messages" not in st.session_state or st.session_state.get("_last_loaded_case") != _current_case:
     try:
-        st.session_state.messages = load_chat_session(username, st.session_state.get("selected_case", "Default Case"))
+        st.session_state.messages = load_chat_session(username, _current_case)
+        st.session_state._last_loaded_case = _current_case
     except Exception as e:
         logger.error("Failed to load chat history: %s", e)
         st.session_state.messages = []
