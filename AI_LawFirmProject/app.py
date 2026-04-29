@@ -10,6 +10,8 @@ N8N_WEBHOOK_URL  =  os.getenv(
     "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8"
 )
 
+MAX_QUESTION_LENGTH = 1000
+
 if not isinstance(N8N_WEBHOOK_URL, str) or not N8N_WEBHOOK_URL.strip() or not N8N_WEBHOOK_URL.startswith(("http://", "https://")):
     raise ValueError("N8N_WEBHOOK_URL must be a non-empty http(s) URL.")
 
@@ -17,11 +19,11 @@ st.title("Private  AI  Assistant")
 st.info("Ask  a  question  about  your  documents.")
 
 with st.form(key='query_form'):
-    question = st.text_input("Your Question:", max_chars=1000).strip()
+    question = st.text_input("Your Question:", max_chars=MAX_QUESTION_LENGTH).strip()
     submit_button  =  st.form_submit_button(label='Get  Answer')
 
 if submit_button and question:
-    if len(question) > 1000:
+    if len(question) > MAX_QUESTION_LENGTH:
         st.error("Your question exceeds the 1000-character limit. Please shorten it and try again.")
     else:
         with st.spinner("Searching  documents  and  generating  an  answer..."):
