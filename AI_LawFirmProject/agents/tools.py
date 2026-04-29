@@ -38,13 +38,18 @@ class InvestigatorTools:
             return f"Error executing web search: {e}"
 
     @staticmethod
-    def query_local_knowledge_graph(query: str) -> str:
+    def query_local_knowledge_graph(entity_name: str) -> str:
         """
         A tool to query the relational Knowledge Graph (e.g., Neo4j).
         This goes beyond vector similarity to find explicit judicial relationships.
         """
-        print(f"[Investigator Tool Executed] Graph Query for: {query}")
-        return f"Simulated Graph DB results. Found relationship: Statute A -> Overruled By -> Supreme Court Decision B."
+        print(f"[Investigator Tool Executed] Graph Query for: {entity_name}")
+        try:
+            from agents.graph_builder import kg_manager
+            return kg_manager.query_relationships(entity_name)
+        except Exception as e:
+            print(f"[Graph Query Error]: {e}")
+            return "Knowledge Graph is currently unavailable."
 
     @staticmethod
     def get_tool_map() -> Dict[str, Any]:

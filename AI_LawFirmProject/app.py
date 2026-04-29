@@ -1,7 +1,11 @@
 import streamlit as st
+import streamlit_authenticator as stauth
 import requests
 import os
 import json
+import yaml
+from yaml.loader import SafeLoader
+from db.persistence import save_chat_session, load_chat_session
 
 # --- Page Configuration ---
 st.set_page_config(
@@ -37,6 +41,27 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- Auth Setup ---
+with open('config.yaml') as file:
+    config = yaml.load(file, Loader=SafeLoader)
+
+authenticator = stauth.Authenticate(
+    config['credentials'],
+    config['cookie']['name'],
+    config['cookie']['key'],
+    config['cookie']['expiry_days'],
+    config['pre-authorized']
+)
+
+name, authentication_status, username = authenticator.login('Login', 'main')
+
+if authentication_status == False:
+    st.error('Username/password is incorrect')
+    st.stop()
+elif authentication_status == None:
+    st.warning('Please enter your username and password')
+    st.stop()
+
 # --- Constants & Helpers ---
 N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n-app:5678/webhook/22398436-911c-4798-a801-789a7411d5e8")
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
@@ -60,6 +85,8 @@ with st.sidebar:
         st.markdown("## ⚖️")
 
     st.title("LexAI Pro v3.0")
+    st.markdown(f"Welcome, **{name}**")
+    authenticator.logout('Logout', 'sidebar')
     st.markdown("---")
 
     st.subheader("🤖 Model Hub")
@@ -97,7 +124,11 @@ st.caption(f"Engine: {backend} | Model: {model_name} | Mode: {'SRLC' if use_srlc
 
 # Initialize chat history
 if "messages" not in st.session_state:
-    st.session_state.messages = []
+    try:
+        st.session_state.messages = load_chat_session(username)
+    except Exception as e:
+        st.error(f"Failed to load DB memory: {e}")
+        st.session_state.messages = []
 
 # Display chat messages from history on app rerun
 for message in st.session_state.messages:
@@ -194,6 +225,12 @@ if query:
                     "thought_stream": thought_stream,
                     "sources": sources
                 })
+
+                # Persist to enterprise database
+                try:
+                    save_chat_session(username, st.session_state.messages)
+                except Exception as e:
+                    st.error(f"Failed to save to database: {e}")
 
             except Exception as e:
                 st.error(f"Error: {e}")

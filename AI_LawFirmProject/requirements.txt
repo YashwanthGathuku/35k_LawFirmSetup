@@ -21,3 +21,6 @@ langchain
 duckduckgo-search
 neo4j
 ddgs
+psycopg2-binary
+streamlit-authenticator
+sqlalchemy
