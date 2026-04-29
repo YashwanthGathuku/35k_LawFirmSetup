@@ -47,7 +47,7 @@ def test_retention_truncation(monkeypatch):
 def test_save_chat_session_commit_failure_rolls_back():
     """Verify that a commit failure triggers rollback and nothing is persisted."""
     session = TestingSessionLocal()
-    with patch.object(type(session), "commit", side_effect=RuntimeError("DB error")):
+    with patch.object(session, "commit", side_effect=RuntimeError("DB error")):
         with patch("db.persistence.SessionLocal", return_value=session):
             with pytest.raises(RuntimeError, match="DB error"):
                 db.persistence.save_chat_session("u4", "CaseF", [{"role": "user", "content": "fail"}])

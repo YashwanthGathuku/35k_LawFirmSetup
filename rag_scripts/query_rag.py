@@ -23,7 +23,7 @@ from llama_index.llms.ollama import Ollama
 import chromadb
 
 _INJECTION_PATTERNS = re.compile(
-    r"(ignore\s+previous\s+instructions|system\s+prompt|developer\s+message|execute)",
+    r"(ignore\s+previous\s+instructions|system\s+prompt|developer\s+message)",
     re.IGNORECASE,
 )
 

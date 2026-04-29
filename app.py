@@ -139,8 +139,8 @@ with st.sidebar:
     st.markdown("---")
     try:
         existing_cases = list_case_sessions(username)
-    except Exception as _e:
-        logger.error("Failed to list case sessions: %s", _e)
+    except Exception as e:
+        logger.error("Failed to list case sessions: %s", e)
         existing_cases = []
     new_case = st.text_input("New case session", value="")
     case_options = existing_cases or ["Default Case"]

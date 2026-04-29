@@ -16,7 +16,7 @@ GUARDRAIL = (
 
 
 _RISKY_PATTERN = re.compile(
-    r"(ignore\s+previous\s+instructions|system\s+prompt|developer\s+message|execute)",
+    r"(ignore\s+previous\s+instructions|system\s+prompt|developer\s+message)",
     re.IGNORECASE,
 )
 
