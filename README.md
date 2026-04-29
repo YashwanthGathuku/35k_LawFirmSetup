@@ -95,3 +95,9 @@ When Self-Reflective Critique is enabled, queries go through a cyclic multi-agen
 ## License
 
 Private & Confidential — DigitalSvarga LLC
+
+## Privacy Modes
+
+- **Local-only strict mode**: set `PRIVACY_MODE_STRICT=true` to disable external web search in SRLC. The investigator uses local knowledge graph strategy only.
+- **Internet-enabled mode**: leave `PRIVACY_MODE_STRICT` unset/false to allow DuckDuckGo evidence gathering.
+- Chat retention controls: `CHAT_MAX_TURNS` and `CHAT_MAX_CHARS` cap per-session stored history.

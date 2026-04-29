@@ -9,14 +9,13 @@ from sqlalchemy import (
     Column,
     Integer,
     String,
-    Text,
     DateTime,
     JSON,
     ForeignKey,
+    UniqueConstraint,
 )
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
-# Default to SQLite for development; override with DATABASE_URI env var for production.
 DATABASE_URI = os.getenv("DATABASE_URI", "sqlite:///tegifa_memory.db")
 
 engine = create_engine(DATABASE_URI, pool_pre_ping=True)
@@ -25,8 +24,6 @@ Base = declarative_base()
 
 
 class User(Base):
-    """Multi-tenant user model."""
-
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -35,27 +32,30 @@ class User(Base):
     hashed_password = Column(String(200), nullable=False)
     firm_id = Column(String(50), nullable=True)
 
-    sessions = relationship("ChatSession", back_populates="user")
+    sessions = relationship("ChatSession", back_populates="user", cascade="all, delete-orphan")
 
 
 class ChatSession(Base):
-    """Persistent case memory for a specific user."""
-
     __tablename__ = "chat_sessions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "case_name", name="uq_user_case_name"),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"))
-    case_name = Column(String(100), default="New Legal Research")
+    user_id = Column(Integer, ForeignKey("users.id"), index=True, nullable=False)
+    case_name = Column(String(100), default="Default Case", nullable=False, index=True)
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+    )
     messages_json = Column(JSON, default=list)
+    summary_text = Column(String(2000), default="")
 
     user = relationship("User", back_populates="sessions")
 
 
 def init_db():
-    """Create all tables if they don't exist."""
     Base.metadata.create_all(bind=engine)
 
 
-# Auto-initialize on import (idempotent via create_all)
 init_db()
