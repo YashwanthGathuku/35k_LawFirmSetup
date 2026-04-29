@@ -67,6 +67,10 @@ N8N_WEBHOOK_URL = os.getenv("N8N_WEBHOOK_URL", "http://n8n-app:5678/webhook/2239
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "http://ollama:11434")
 DOCS_DIR = os.getenv("DOCS_DIR", "/app/docs")
 SIDEBAR_ICON_PATH = os.getenv("SIDEBAR_ICON_PATH", "/app/assets/sidebar-icon.png")
+MAX_QUESTION_LENGTH = 1000
+
+if not isinstance(N8N_WEBHOOK_URL, str) or not N8N_WEBHOOK_URL.strip() or not N8N_WEBHOOK_URL.startswith(("http://", "https://")):
+    raise ValueError("N8N_WEBHOOK_URL must be a non-empty http(s) URL.")
 
 def get_ollama_models():
     try:
@@ -155,82 +159,85 @@ for message in st.session_state.messages:
 query = st.chat_input("Enter complex legal inquiry...")
 
 if query:
-    # Add user message to chat history
-    st.session_state.messages.append({"role": "user", "content": query})
+    if len(query) > MAX_QUESTION_LENGTH:
+        st.error(f"Your question exceeds the {MAX_QUESTION_LENGTH}-character limit. Please shorten it and try again.")
+    else:
+        # Add user message to chat history
+        st.session_state.messages.append({"role": "user", "content": query})
 
-    with st.chat_message("user"):
-        st.markdown(query)
+        with st.chat_message("user"):
+            st.markdown(query)
 
-    with st.chat_message("assistant"):
-        with st.spinner("LexAI is thinking (Self-Reflective Algorithm Active)..."):
-            try:
-                payload = {
-                    "question": query,
-                    "use_cag": use_cag,
-                    "use_srlc": use_srlc,
-                    "model_type": backend,
-                    "model_name": model_name
-                }
-                response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=240)
-                response.raise_for_status()
-                result = response.json()
-
-                # Check for direct answer from webhook (backward compatibility)
-                answer_text = ""
-                sources = []
-                thought_stream = []
-
-                if isinstance(result, list) and len(result) > 0:
-                    raw_stdout = result[0].get('stdout', '')
-                    answer_text = result[0].get('answer', '')
-                else:
-                    raw_stdout = result.get('stdout', '')
-                    answer_text = result.get('answer', '')
-
-                # If raw_stdout contains JSON, parse it for advanced data
-                if raw_stdout:
-                    try:
-                        data = json.loads(raw_stdout)
-                        answer_text = data.get("answer", answer_text)
-                        sources = data.get("sources", [])
-                        thought_stream = data.get("thought_stream", [])
-                    except json.JSONDecodeError:
-                        # Fallback to treat raw_stdout as plain text answer if not JSON
-                        if not answer_text:
-                            answer_text = raw_stdout
-
-                # Show Thought Stream
-                if thought_stream:
-                    with st.status("Algorithm Thought Process", expanded=False) as status:
-                        for step in thought_stream:
-                            st.markdown(f"**Step: {step['step']}**")
-                            st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
-                        status.update(label="Critique & Refinement Complete", state="complete")
-
-                st.markdown(answer_text if answer_text else "No answer generated.")
-
-                if sources:
-                    with st.expander(f"📚 Sources & Citations ({len(sources)} verified)"):
-                        for src in sources:
-                            meta = src.get('metadata', {})
-                            file_name = meta.get('file_name')
-                            file_path = meta.get('file_path')
-                            fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
-                            st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
-
-                # Add assistant response to chat history
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "content": answer_text if answer_text else "No answer generated.",
-                    "thought_stream": thought_stream,
-                    "sources": sources
-                })
-
-                # Persist to enterprise database
+        with st.chat_message("assistant"):
+            with st.spinner("LexAI is thinking (Self-Reflective Algorithm Active)..."):
                 try:
-                    save_chat_session(username, st.session_state.messages)
-                except Exception as e:
-                    st.error(f"Failed to save to database: {e}")
+                    payload = {
+                        "question": query,
+                        "use_cag": use_cag,
+                        "use_srlc": use_srlc,
+                        "model_type": backend,
+                        "model_name": model_name
+                    }
+                    response = requests.post(N8N_WEBHOOK_URL, json=payload, timeout=240)
+                    response.raise_for_status()
+                    result = response.json()
 
-            except Exception as e:
-                st.error(f"Error: {e}")
+                    # Check for direct answer from webhook (backward compatibility)
+                    answer_text = ""
+                    sources = []
+                    thought_stream = []
+
+                    if isinstance(result, list) and len(result) > 0:
+                        raw_stdout = result[0].get('stdout', '')
+                        answer_text = result[0].get('answer', '')
+                    else:
+                        raw_stdout = result.get('stdout', '')
+                        answer_text = result.get('answer', '')
+
+                    # If raw_stdout contains JSON, parse it for advanced data
+                    if raw_stdout:
+                        try:
+                            data = json.loads(raw_stdout)
+                            answer_text = data.get("answer", answer_text)
+                            sources = data.get("sources", [])
+                            thought_stream = data.get("thought_stream", [])
+                        except json.JSONDecodeError:
+                            # Fallback to treat raw_stdout as plain text answer if not JSON
+                            if not answer_text:
+                                answer_text = raw_stdout
+
+                    # Show Thought Stream
+                    if thought_stream:
+                        with st.status("Algorithm Thought Process", expanded=False) as status:
+                            for step in thought_stream:
+                                st.markdown(f"**Step: {step['step']}**")
+                                st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
+                            status.update(label="Critique & Refinement Complete", state="complete")
+
+                    st.markdown(answer_text if answer_text else "No answer generated.")
+
+                    if sources:
+                        with st.expander(f"📚 Sources & Citations ({len(sources)} verified)"):
+                            for src in sources:
+                                meta = src.get('metadata', {})
+                                file_name = meta.get('file_name')
+                                file_path = meta.get('file_path')
+                                fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
+                                st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
+
+                    # Add assistant response to chat history
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": answer_text if answer_text else "No answer generated.",
+                        "thought_stream": thought_stream,
+                        "sources": sources
+                    })
+
+                    # Persist to enterprise database
+                    try:
+                        save_chat_session(username, st.session_state.messages)
+                    except Exception as e:
+                        st.error(f"Failed to save to database: {e}")
+
+                except Exception as e:
+                    st.error(f"Error: {e}")
