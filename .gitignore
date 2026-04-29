@@ -1,0 +1,25 @@
+# --- Runtime secrets & credentials ---
+# Copy config.yaml.template to config.yaml and fill in real values.
+# Never commit the live config file with password hashes / cookie keys.
+AI_LawFirmProject/config.yaml
+
+# --- Runtime data / databases ---
+*.db
+AI_LawFirmProject/db/*.db
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+.env
+.venv/
+venv/
+
+# --- Node / n8n ---
+node_modules/
+AI_LawFirmProject/n8n-data/
+
+# --- Vector store runtime data ---
+AI_LawFirmProject/chroma_db/
+AI_LawFirmProject/storage/
+chroma_db/
