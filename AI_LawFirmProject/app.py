@@ -20,28 +20,31 @@ with st.form(key='query_form'):
     question = st.text_input("Your Question:", max_chars=1000).strip()
     submit_button  =  st.form_submit_button(label='Get  Answer')
 
-if submit_button  and question:
-    with st.spinner("Searching  documents  and  generating  an  answer..."):
-        try:
-            payload  =  {"question":  question}
-            response  =  requests.post(N8N_WEBHOOK_URL,  json=payload,  timeout=120)
-            response.raise_for_status()
-            result  =  response.json()
+if submit_button and question:
+    if len(question) > 1000:
+        st.error("Your question exceeds the 1000-character limit. Please shorten it and try again.")
+    else:
+        with st.spinner("Searching  documents  and  generating  an  answer..."):
+            try:
+                payload  =  {"question":  question}
+                response  =  requests.post(N8N_WEBHOOK_URL,  json=payload,  timeout=120)
+                response.raise_for_status()
+                result  =  response.json()
 
-            if result  and isinstance(result,  list)  and len(result)  >  0 and 'stdout' in result[0]:
-                answer  =  result[0]['stdout']
-                st.success("Answer:")
-                st.write(answer)
-            elif isinstance(result, dict) and 'answer' in result:
-                answer = result['answer']
-                st.success("Answer:")
-                st.write(answer)
-            else:
-                st.error("The assistant returned an unexpected response format. Please try again.")
-                # Log detailed error for debugging if needed, but don't show all to user
-                # st.json(result)
+                if result  and isinstance(result,  list)  and len(result)  >  0 and 'stdout' in result[0]:
+                    answer  =  result[0]['stdout']
+                    st.success("Answer:")
+                    st.write(answer)
+                elif isinstance(result, dict) and 'answer' in result:
+                    answer = result['answer']
+                    st.success("Answer:")
+                    st.write(answer)
+                else:
+                    st.error("The assistant returned an unexpected response format. Please try again.")
+                    # Log detailed error for debugging if needed, but don't show all to user
+                    # st.json(result)
 
-        except requests.exceptions.Timeout:
-            st.error("The request timed out. The workflow may be stalled. Please try again.")
-        except Exception  as e:
-            st.error(f"An  unexpected  error  occurred:  {e}")
+            except requests.exceptions.Timeout:
+                st.error("The request timed out. The workflow may be stalled. Please try again.")
+            except Exception  as e:
+                st.error(f"An  unexpected  error  occurred:  {e}")
