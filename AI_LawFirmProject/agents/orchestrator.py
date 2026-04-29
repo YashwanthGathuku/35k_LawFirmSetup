@@ -2,7 +2,7 @@ from typing import TypedDict, Annotated, Sequence, List
 import operator
 import logging
 from langgraph.graph import StateGraph, END
-from agents.tools import InvestigatorTools
+from AI_LawFirmProject.agents.tools import InvestigatorTools
 
 logger = logging.getLogger("CognitiveOrchestrator")
 logger.setLevel(logging.INFO)

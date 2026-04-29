@@ -3,7 +3,6 @@ import streamlit_authenticator as stauth
 import requests
 import os
 import json
-import html
 import yaml
 from yaml.loader import SafeLoader
 from db.persistence import save_chat_session, load_chat_session
@@ -43,8 +42,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- Auth Setup ---
-config_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config.yaml')
-with open(config_path) as file:
+with open('config.yaml') as file:
     config = yaml.load(file, Loader=SafeLoader)
 
 authenticator = stauth.Authenticate(
@@ -140,7 +138,7 @@ for message in st.session_state.messages:
             with st.status("Algorithm Thought Process", expanded=False, state="complete"):
                 for step in message["thought_stream"]:
                     st.markdown(f"**Step: {step['step']}**")
-                    st.markdown(f'<div class="thought-bubble">{html.escape(step["content"])}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
 
         st.markdown(message["content"])
 
@@ -152,7 +150,7 @@ for message in st.session_state.messages:
                     file_name = meta.get('file_name')
                     file_path = meta.get('file_path')
                     fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
-                    st.markdown(f'<div class="source-card"><strong>{html.escape(fname)}</strong>: {html.escape(src["text"][:300])}...</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
 
 query = st.chat_input("Enter complex legal inquiry...")
 
@@ -206,7 +204,7 @@ if query:
                     with st.status("Algorithm Thought Process", expanded=False) as status:
                         for step in thought_stream:
                             st.markdown(f"**Step: {step['step']}**")
-                            st.markdown(f'<div class="thought-bubble">{html.escape(step["content"])}</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="thought-bubble">{step["content"]}</div>', unsafe_allow_html=True)
                         status.update(label="Critique & Refinement Complete", state="complete")
 
                 st.markdown(answer_text if answer_text else "No answer generated.")
@@ -218,7 +216,7 @@ if query:
                             file_name = meta.get('file_name')
                             file_path = meta.get('file_path')
                             fname = file_name or (os.path.basename(file_path) if file_path else 'Unknown Source')
-                            st.markdown(f'<div class="source-card"><strong>{html.escape(fname)}</strong>: {html.escape(src["text"][:300])}...</div>', unsafe_allow_html=True)
+                            st.markdown(f'<div class="source-card"><strong>{fname}</strong>: {src["text"][:300]}...</div>', unsafe_allow_html=True)
 
                 # Add assistant response to chat history
                 st.session_state.messages.append({

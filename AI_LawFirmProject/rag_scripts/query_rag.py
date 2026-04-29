@@ -17,11 +17,13 @@ import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from agents.orchestrator import run_cognitive_cycle
 
-#  1.  SETUP  LOGGING
+#  1.  SETUP  LOGGING & STDOUT REDIRECTION
 #  We must guarantee that NO external libraries (like transformers or llama-index)
 #  can pollute stdout with progress bars or warnings, which would corrupt the JSON
-#  expected by n8n. Stdout is redirected to stderr only when running as a CLI so
-#  imports do not have process-wide side effects.
+#  expected by n8n. We redirect stdout to stderr for the duration of execution.
+original_stdout = sys.stdout
+sys.stdout = sys.stderr
+
 LOG_LEVEL = logging.INFO if os.getenv("RAG_DEBUG_LOGS", "").lower() in ("1", "true", "yes", "on") else logging.WARNING
 logging.basicConfig(stream=sys.stderr,  level=LOG_LEVEL)
 logging.getLogger("llama_index").setLevel(logging.WARNING)
@@ -88,23 +90,18 @@ def execute_query(question, index, llm, top_k=3, use_cag=False, use_srlc=False, 
         "answer": answer,
         "sources": sources,
         "thought_stream": thought_stream,
-        "mode": "COGNITIVE" if use_srlc else ("CAG" if use_cag else "RAG"),
+        "mode": "SRLC" if use_srlc else ("CAG" if use_cag else "RAG"),
         "model": model_name
     }
 
 if __name__ == "__main__":
-    # Redirect stdout to stderr so no library output pollutes the JSON response
-    # expected by n8n. Only do this in CLI mode to avoid side effects on import.
-    original_stdout = sys.stdout
-    sys.stdout = sys.stderr
-
     parser  =  argparse.ArgumentParser(description="Query  the  RAG  pipeline  with  a  specific  question.")
     parser.add_argument("question",  type=str,  help="The  question  you  want  to  ask.")
     parser.add_argument("--db-path", type=str, default=os.getenv("RAG_DB_PATH", "/app/chroma_db"), help="Path to ChromaDB")
     parser.add_argument("--storage-path", type=str, default=os.getenv("RAG_STORAGE_PATH", "/app/storage"), help="Path to storage")
     parser.add_argument("--top-k", type=int, default=3, help="Number of documents to retrieve")
     parser.add_argument("--use-cag", action="store_true", help="Enable Cache-Augmented Generation mode")
-    parser.add_argument("--use-srlc", action="store_true", help="Enable Cognitive Multi-Agent cycle")
+    parser.add_argument("--use-srlc", action="store_true", help="Enable Self-Reflective Legal Critique algorithm")
     parser.add_argument("--model-type", type=str, default="llama.cpp", choices=["llama.cpp", "ollama"], help="Type of LLM backend")
     parser.add_argument("--model-name", type=str, default="local-model", help="Name of the model (mostly for Ollama)")
 

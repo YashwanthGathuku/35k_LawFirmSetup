@@ -3,18 +3,10 @@ import datetime
 from sqlalchemy import create_engine, Column, Integer, String, Text, DateTime, JSON, ForeignKey
 from sqlalchemy.orm import declarative_base, sessionmaker, relationship
 
-# Use POSTGRES_URI if set; otherwise default to a writable runtime data directory
-# outside the repository tree so we never store the DB file inside the source tree.
-DATABASE_URI = os.getenv("POSTGRES_URI")
-if not DATABASE_URI:
-    data_dir = os.getenv("LEXAI_DATA_DIR", "/app/data")
-    # Require an absolute path to prevent path traversal via the env variable.
-    if not os.path.isabs(data_dir):
-        raise ValueError(f"LEXAI_DATA_DIR must be an absolute path, got: {data_dir!r}")
-    data_dir = os.path.realpath(data_dir)
-    os.makedirs(data_dir, exist_ok=True)
-    sqlite_db_path = os.path.join(data_dir, "lexai_memory.db")
-    DATABASE_URI = f"sqlite:///{sqlite_db_path}"
+# We will use SQLite by default for easy Streamlit integration,
+# but allow a POSTGRES_URI override for the enterprise Docker setup.
+# In testing locally without docker, we fallback to a relative path.
+DATABASE_URI = os.getenv("POSTGRES_URI", "sqlite:///AI_LawFirmProject/db/lexai_memory.db")
 
 engine = create_engine(DATABASE_URI)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
