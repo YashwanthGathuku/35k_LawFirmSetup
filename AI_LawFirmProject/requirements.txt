@@ -14,3 +14,16 @@ torchvision
 transformers
 pydantic
 httpx
+
+# --- AI Cognitive Architecture Dependencies ---
+langgraph
+langchain
+duckduckgo-search
+neo4j
+ddgs
+psycopg2-binary
+streamlit-authenticator
+sqlalchemy
+pytest
+pytest-cov
+pytest-mock

@@ -1,2 +1,5 @@
 streamlit
 requests
+streamlit-authenticator
+sqlalchemy
+psycopg2-binary
