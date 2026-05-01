@@ -1,0 +1,57 @@
+# =============================================================================
+# Tegifa Legal — .gitignore
+# =============================================================================
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+venv/
+env/
+
+# --- Environment & Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# --- Databases ---
+*.db
+*.sqlite3
+chroma_db/
+storage/
+
+# --- Coverage & Testing ---
+.coverage
+.coverage.*
+htmlcov/
+.pytest_cache/
+.tox/
+
+# --- Docker ---
+n8n-data/
+
+# --- Models (large files) ---
+models/
+*.gguf
+*.bin
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+
+# --- Uploaded docs ---
+docs/

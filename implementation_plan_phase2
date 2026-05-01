@@ -1,0 +1,72 @@
+# Tegifa Legal: Phase 2 Expansion & Architecture Upgrade
+
+You are absolutely right. The Deal Graph currently maps definitions, but the true power comes from mapping **Obligations** (who has to do what, by when) and **Liabilities** (who pays if things go wrong). Furthermore, to be a true enterprise product, Tegifa must handle multiple isolated cases simultaneously.
+
+Here is the comprehensive plan to build out these capabilities and transform Tegifa into a full Legal Operating System.
+
+## Part 1: Completing the Deal Anatomy Graph
+
+We will upgrade `agents/deal_graph.py` to extract and graph the following:
+1. **Obligations:** Extracted with properties `Party`, `Action`, `Deadline`.
+2. **Liabilities/Indemnities:** Extracted with properties `Cap`, `Scope`, `Exceptions`.
+3. **Graphing Logic:** Add new node types (`Obligation`, `Liability`) and link them to the `Document` nodes. We will also link `Obligation` nodes to `DefinedTerm` nodes if the obligation uses a defined term (e.g., "Must deliver the *Software*").
+
+## Part 2: "Matter Management" (Multi-Case Architecture)
+
+Currently, Tegifa operates in a single global workspace. If you upload a document, it mixes with all previous documents. We will implement **Matter Management**.
+
+1. **Database Schema Update (`db/models.py`)**: 
+   - Add a `Matter` (or Case) model.
+   - Link `ChatSession` and `Document` metadata to a specific `Matter`.
+2. **Isolated Vector Stores**:
+   - Update ChromaDB integration so that documents are ingested with a `matter_id` in their metadata. 
+   - RAG queries will forcefully filter by the active `matter_id`, ensuring completely separated knowledge bases.
+3. **UI Overhaul (`app.py`)**:
+   - Add a sidebar dropdown: **"Select Active Matter"** or **"Create New Matter"**.
+   - The UI (Q&A, Contract Review, Deal Graph) will dynamically refresh based on the selected case.
+
+## Part 3: Brainstorming Future AI Breakthroughs
+
+Beyond the Graph and Matter Management, here are three highly niche, AI-native features we can build next to make legal work radically simpler:
+
+### A. The "Shadow Redliner" (.docx Auto-Drafter)
+Instead of just telling a lawyer "this clause is bad," Tegifa generates a fully formatted Microsoft Word `.docx` file with **Track Changes** applied, physically rewriting the contract to fix the loopholes based on a standard playbook.
+
+### B. "Chronos" (Automated Litigation Timeline & Docketing)
+Litigators spend weeks building timelines from emails, contracts, and court filings. Tegifa can scan a folder of unstructured documents, extract every date, event, and claim, and generate an interactive Timeline UI. It can also calculate relative deadlines (e.g., "Notice must be given 30 days after breach").
+
+### C. Deposition/Transcript Interrogator
+Upload a 400-page deposition transcript. The AI automatically generates a "Page-Line Summary" (a standard legal format) and cross-references it to find where a witness contradicted their own previous statements or documentary evidence.
+
+---
+
+## User Review Required
+
+> [!IMPORTANT]
+> To proceed, I need your steering on the order of execution:
+> 
+> **Option 1**: Focus purely on Part 1 right now — finishing the Obligations/Liabilities extraction in the Deal Graph.
+> **Option 2**: Focus on Part 2 right now — restructuring the app to handle Multiple Cases/Matters (this requires changing how the database and UI work).
+> **Option 3**: Do both Part 1 and Part 2 simultaneously as a massive upgrade.
+> 
+> Also, let me know which of the brainstormed ideas (A, B, or C) excites you the most for the future!
+
+## Proposed Code Changes (For Option 3)
+
+### `agents/deal_graph.py`
+#### [MODIFY] `e:\projects\tegifa\agents\deal_graph.py`
+- Add `OBLIGATION_EXTRACTION_PROMPT` and `LIABILITY_EXTRACTION_PROMPT`.
+- Update `build_deal_graph` to create these new node types and edges.
+
+### `db/models.py`
+#### [MODIFY] `e:\projects\tegifa\db\models.py`
+- Add `class Matter(Base): ...`
+- Add foreign keys to `ChatSession`.
+
+### `rag_scripts/rag_setup.py` & `query_rag.py`
+#### [MODIFY] `e:\projects\tegifa\rag_scripts\rag_setup.py`
+- Add `matter_id` filtering to ChromaDB queries to isolate RAG per case.
+
+### `app.py`
+#### [MODIFY] `e:\projects\tegifa\app.py`
+- Add sidebar state management for active matters.

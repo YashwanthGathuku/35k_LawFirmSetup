@@ -1,0 +1,15 @@
+MASTER SERVICES AGREEMENT
+
+This Master Services Agreement ("MSA") is entered into by and between Acme Corp and Tech Solutions.
+
+ARTICLE 1: DEFINITIONS
+"Services" means the software development and IT consulting services provided by Tech Solutions.
+"Confidential Information" means any proprietary data shared between the parties.
+
+ARTICLE 2: OBLIGATIONS
+Tech Solutions must deliver the software source code within 30 days of project commencement.
+Acme Corp shall pay the invoice within 15 days of receipt.
+
+ARTICLE 3: LIABILITIES
+Tech Solutions' total liability under this MSA shall not exceed $10,000.
+Tech Solutions agrees to indemnify Acme Corp against any third-party intellectual property claims.

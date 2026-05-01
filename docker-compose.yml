@@ -1,0 +1,102 @@
+# =============================================================================
+# Tegifa Legal — Docker Compose
+# Copy .env.example to .env and fill in real values before running.
+# =============================================================================
+
+services:
+  caddy:
+    image: caddy:2.8.4
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+    networks:
+      - private-ai-net
+
+  streamlit-app:
+    build:
+      context: .
+      dockerfile: streamlit.Dockerfile
+    restart: unless-stopped
+    environment:
+      - OLLAMA_HOST=${OLLAMA_HOST:-http://ollama:11434}
+      - LLM_API_BASE=${LLM_API_BASE:-http://llm-server:8080/v1}
+      - AUTH_COOKIE_KEY=${AUTH_COOKIE_KEY:?AUTH_COOKIE_KEY must be set in .env}
+      - DATABASE_URI=${DATABASE_URI:-sqlite:///tegifa_memory.db}
+      - RAG_DB_PATH=/app/chroma_db
+      - RAG_STORAGE_PATH=/app/storage
+    volumes:
+      - ./chroma_db:/app/chroma_db
+      - ./storage:/app/storage
+      - ./docs:/app/docs
+    networks:
+      - private-ai-net
+
+  llm-server:
+    build:
+      context: .
+      dockerfile: llm-server.Dockerfile
+    restart: unless-stopped
+    volumes:
+      - ./models:/models
+    command:
+      - "-m"
+      - "/models/${MODEL_FILE:-Phi-4-mini-instruct.Q8_0.gguf}"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8080"
+    networks:
+      - private-ai-net
+
+  ollama:
+    image: ollama/ollama:latest
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - private-ai-net
+    # Uncomment for GPU support:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  neo4j-db:
+    image: neo4j:5.18.1
+    restart: unless-stopped
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?NEO4J_PASSWORD must be set in .env}
+    # Ports NOT exposed to host — only accessible within Docker network
+    networks:
+      - private-ai-net
+    volumes:
+      - neo4j_data:/data
+
+  postgres-db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-tegifa_admin}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      - POSTGRES_DB=${POSTGRES_DB:-tegifa_memory}
+    # Ports NOT exposed to host — only accessible within Docker network
+    networks:
+      - private-ai-net
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+networks:
+  private-ai-net:
+
+volumes:
+  caddy_data:
+  ollama_data:
+  neo4j_data:
+  pg_data:

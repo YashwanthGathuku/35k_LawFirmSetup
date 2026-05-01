@@ -1,0 +1,13 @@
+STATEMENT OF WORK (SOW) #1
+
+This SOW is governed by the MSA between Acme Corp and Tech Solutions.
+
+ARTICLE 1: DEFINITIONS
+"Services" means the provision of customer support staff only.
+"Deliverables" means the final compiled binaries of the application.
+
+ARTICLE 2: OBLIGATIONS
+Acme Corp must provide access to internal servers by Friday.
+
+ARTICLE 3: LIABILITIES
+Despite any other agreement, Tech Solutions' liability under this SOW is capped at $50,000.
