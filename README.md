@@ -1,119 +1,137 @@
-# Tegifa Legal — Source-Grounded Legal Intelligence
+# ⚖️ Tegifa Legal — Autonomous Legal Operating System (v1.0 MVP)
 
-Private, local-first AI legal intelligence platform. Upload legal documents, ask questions with pinpoint citations, and run full contract reviews with clause-by-clause risk analysis — all running on your own infrastructure.
+Tegifa Legal is a private, local-first **Autonomous Legal Operating System** designed for high-stakes law firms. It transforms raw legal documents into an intelligent, event-driven knowledge base capable of cross-document conflict detection, autonomous drafting, and automated workflow integration.
 
-## What Makes This Different
+Built for privacy-conscious attorneys, Tegifa runs entirely on your own infrastructure (Ollama/Docker), ensuring zero data leakage while providing intelligence that rivals top-tier legal tech suites.
 
-**1. Pinpoint Citations, Not Vague Snippets**
-Every answer cites the exact page, paragraph, and section heading from your documents, with confidence scores. Lawyers can verify every claim.
+---
 
-**2. Contract Review Vertical**
-Upload a contract and get: clause-by-clause risk assessment, obligation extraction (who, what, when), missing clause detection, and an executive summary with an overall risk score.
+## 🌟 Key Breakthroughs in v1.0
 
-**3. Self-Reflective Critique (SRLC)**
-A multi-agent pipeline where an AI "Skeptic" challenges every answer before it reaches you. If the answer lacks evidence, an Investigator searches for more — automatically.
+### 1. 🕸️ Deal Anatomy Graph (Cross-Document Intelligence)
+Unlike standard RAG tools that look at one document at a time, Tegifa builds a **Knowledge Graph** of your entire deal.
+- **Definition Drift:** Automatically flags when "Confidential Information" is defined differently in an NDA versus a Master Agreement.
+- **Conflict Mapping:** Visualizes the relationship between Obligations, Liabilities, and Parties across multiple documents.
+- **Red Nodes:** Glowing visual alerts in the UI when a legal contradiction is detected.
 
-**4. Nougat OCR for Scanned Documents**
-Uses Meta's Nougat model for academic/scanned PDF extraction that preserves tables, formulas, and complex layouts better than standard OCR.
+### 2. ✍️ The Shadow Redliner (Autonomous Drafting)
+The first AI that doesn't just "talk"—it "works."
+- **One-Click Harmonization:** Found a conflict in the graph? Click "Harmonize" and Tegifa drafts the fix.
+- **Native .docx Output:** Generates a real Microsoft Word document with **Visual Redlining** (Track-Changes simulation) applied.
+- **Lawyer-in-the-Loop:** Redlines are presented as suggestions, allowing the attorney to maintain 100% control over the final signature-ready copy.
 
-**5. Everything Runs Locally**
-No data leaves your network. LLM inference runs on llama.cpp or Ollama. Documents stay in your Docker volumes.
+### 3. 🧠 Advanced Cognitive Architecture (CAG)
+Powered by **LangGraph**, Tegifa uses a state-machine reasoning loop that replaces linear prompts:
+- **Router Agent:** Intelligently directs queries to specialized nodes (Legal Reasoner, Conflict Resolver, or Investigator).
+- **Investigator (Live Web Search):** Can live-query the internet (DuckDuckGo) to fetch the latest statutes, case law, or legislative bills in real-time.
+- **Action Executor:** Can trigger external webhooks to send alerts or sync data with firm management software.
 
-## Architecture
+### 4. 🔗 n8n Automation & Webhooks
+Tegifa is an "extensible" OS. 
+- **Inbound Webhooks:** FastAPI endpoints allow **n8n**, Zapier, or Outlook to automatically ingest client email attachments into a specific Matter workspace.
+- **Outbound Triggers:** The AI can autonomously signal n8n to send Slack alerts, update CRM records, or file documents when specific legal milestones are met.
 
+### 5. 📁 Matter-Based Workspace Isolation
+Full multi-tenant architecture. 
+- **Workspace Partitioning:** Every case/matter has its own isolated vector database and SQLite memory.
+- **Metadata Filtering:** Ensures that queries for "Matter A" never leak into or hallucinate data from "Matter B."
+
+---
+
+## 🛠️ Tech Stack
+
+- **UI:** Streamlit (Custom Premium CSS Overhaul)
+- **API:** FastAPI (Webhooks & Background Tasks)
+- **Orchestration:** LangGraph (Stateful Multi-Agent Reasoning)
+- **Intelligence:** Ollama (Llama 3 / Gemma 4)
+- **Vector DB:** ChromaDB (Metadata-filtered)
+- **Graph Engine:** NetworkX + Streamlit Agraph
+- **Document Processing:** python-docx, PyPDF2, Meta's Nougat OCR
+- **Automation:** n8n (via Docker Compose)
+
+---
+
+## 🏗️ Architecture Overview
+
+```text
+    [ LAWYER UI (Streamlit) ] <───────> [ AUTOMATION HUB (n8n) ]
+               │                                 │
+               ▼                                 ▼
+    [ COGNITIVE ARCHITECTURE ] <───────> [ WEBHOOK API (FastAPI) ]
+    (LangGraph State Machine)                    │
+               │                                 │
+    ┌──────────┴──────────┐                      │
+    ▼                     ▼                      ▼
+[ LEGAL REASONER ]  [ CONFLICT RESOLVER ]  [ ACTION EXECUTOR ]
+(RAG/CAG Logic)     (Graph Analysis)       (n8n Integration)
+               │
+               ▼
+    [ VECTOR STORE / GRAPH DB ]
+    (Isolated by Matter ID)
 ```
-User Browser
-    │
-    ▼
-  Caddy (TLS)
-    │
-    ▼
-  Streamlit App ─────────────────────────────────────────┐
-    │                                                     │
-    ├──► Legal Q&A Tab                                    │
-    │     ├── RAG Pipeline (LlamaIndex + ChromaDB)        │
-    │     ├── Citation Engine (page/paragraph pinpoints)  │
-    │     └── SRLC Multi-Agent Cycle (LangGraph)          │
-    │           Reasoner → Epistemologist → Investigator   │
-    │                                                     │
-    ├──► Contract Review Tab                              │
-    │     ├── Document Processor (Nougat OCR + pypdf)     │
-    │     ├── Clause Classifier (14 legal clause types)   │
-    │     ├── Risk Scorer (per-clause + aggregate)        │
-    │     ├── Obligation Extractor (party/action/deadline)│
-    │     └── Missing Clause Detector                     │
-    │                                                     │
-    ├──► Knowledge Graph (Neo4j) ← optional               │
-    └──► Persistence (PostgreSQL / SQLite)                │
-```
 
-## Quick Start
+---
 
+## 🚀 Installation & Setup
+
+### 1. Prerequisites
+- **Python 3.10+**
+- **Ollama** (Running locally)
+- **Docker & Docker Compose** (For n8n and database services)
+
+### 2. Environment Setup
 ```bash
-# 1. Clone and configure
-git clone <repo> && cd AI_LawFirmProject
-cp .env.example .env
-# Edit .env — set passwords and cookie key
+# Clone the repository
+git clone https://github.com/YashwanthGathuku/35k_LawFirmSetup.git
+cd 35k_LawFirmSetup
 
-# 2. Add a GGUF model
-mkdir models && cp /path/to/model.gguf models/
+# Create Virtual Environment
+python -m venv venv
+source venv/bin/activate  # Or venv\Scripts\activate on Windows
 
-# 3. Launch
-docker-compose up --build -d
-
-# 4. Open https://localhost and log in
+# Install Dependencies
+pip install -r requirements.txt
 ```
 
-## Contract Review Demo
+### 3. Configure `.env`
+Copy `.env.example` to `.env` and configure your keys:
+- `OLLAMA_HOST`: Set to your local Ollama address (default: `http://localhost:11434`)
+- `SECRET_KEY`: For auth cookies.
 
-1. Go to the **Contract Review** tab
-2. Upload a PDF contract
-3. Click **Run Contract Review**
-4. Get back:
-   - Executive summary with overall risk score (0-10)
-   - Clause-by-clause analysis with risk badges
-   - Extracted obligations (party, action, deadline)
-   - Missing standard clauses warning
-   - Export as JSON
+### 4. Run the Platform
+You need to run two services simultaneously:
 
-## Project Structure
-
-```
-├── app.py                          # Streamlit UI (Q&A + Contract Review)
-├── agents/
-│   ├── orchestrator.py             # LangGraph SRLC pipeline
-│   ├── contract_analyzer.py        # Contract review engine
-│   ├── tools.py                    # Web search & graph query
-│   └── graph_builder.py            # Neo4j knowledge graph
-├── rag_scripts/
-│   ├── document_processor.py       # Nougat OCR + clause tagging + chunking
-│   ├── citation_engine.py          # Pinpoint citation builder
-│   ├── rag_setup.py                # Document ingestion pipeline
-│   └── query_rag.py                # RAG/CAG/SRLC query engine
-├── db/
-│   ├── models.py                   # SQLAlchemy models
-│   └── persistence.py              # Chat session persistence
-├── tests/                          # 6 test files, 60+ test cases
-├── docker-compose.yml
-├── .env.example
-└── config.yaml
+**Terminal 1: The Webhook Server**
+```bash
+python api/webhooks.py
 ```
 
-## Legal Clause Types Detected (14)
+**Terminal 2: The Streamlit UI**
+```bash
+streamlit run app.py
+```
 
-Termination, Indemnification, Liability, Confidentiality, Intellectual Property,
-Governing Law, Payment, Force Majeure, Non-Compete, Warranty, Insurance,
-Assignment, Severability, Entire Agreement
+---
 
-## Security
+## 📖 Usage Guide: The MVP Workflow
 
-- All secrets in `.env` (never committed)
-- XSS protection via `html.escape()` on all dynamic content
-- Non-root Docker containers
-- Database ports closed to host
-- Input length validation
-- Auth cookie key required via environment
+1.  **Create a Matter:** On the sidebar, create a new case (e.g., "Project Phoenix Acquisition").
+2.  **Ingest Documents:** 
+    - **Manual:** Upload PDFs/Word docs in the Ingestion tab.
+    - **Automated:** Copy the Webhook URL from the sidebar into your n8n workflow to ingest attachments from Gmail/Outlook.
+3.  **Analyze the Deal:** Go to the **Deal Anatomy Graph** tab, upload all related deal docs, and click **Analyze**. Watch the AI map the relationships and highlight red-flag conflicts.
+4.  **Auto-Draft Redlines:** Click **"Harmonize"** on any detected conflict to download a redlined `.docx` file ready for review.
+5.  **Live Research:** Use the Legal Q&A tab to ask about current laws (e.g., "What is the current status of the California AI safety bill?"). The AI will search the web and provide a cited answer.
 
-## License
+---
 
-Private & Confidential — DigitalSvarga LLC
+## 🛡️ Security & Privacy
+- **100% Local Inference:** No legal data is sent to OpenAI or Anthropic.
+- **Workspace Isolation:** Enforced at the database query level via `matter_id`.
+- **Encrypted Persistence:** SQLite/PostgreSQL with secure environment-based authentication.
+
+---
+
+## 📜 License
+Private & Confidential — DigitalSvarga LLC. 
+Built with ⚖️ for the future of Law.
